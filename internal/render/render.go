@@ -28,7 +28,7 @@ func RenderMessage(msg session.MessageEntry, msgIndex int, opts *RenderOptions) 
 	var buf bytes.Buffer
 
 	roleClass := msg.Role
-	roleLabel := strings.Title(msg.Role)
+	roleLabel := capitalizeFirst(msg.Role)
 
 	timestamp := ""
 	if !msg.Timestamp.IsZero() {
@@ -317,4 +317,12 @@ func formatTimestamp(t time.Time) string {
 		return ""
 	}
 	return t.Local().Format("Jan 2, 2006 3:04 PM")
+}
+
+// capitalizeFirst capitalizes the first letter of a string
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
