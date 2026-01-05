@@ -460,6 +460,32 @@ func (g *Generator) getSearchJS(totalPages int) string {
 	const searchStatus = document.getElementById('search-status');
 	const searchResults = document.getElementById('search-results');
 
+	// Detect gistpreview.github.io and extract gist ID for URL rewriting
+	function getPageUrl(pageNum) {
+		const filename = 'page-' + String(pageNum).padStart(3, '0') + '.html';
+		if (window.location.hostname.includes('gistpreview.github.io')) {
+			const search = window.location.search.slice(1);
+			const gistId = search.split('/')[0];
+			if (gistId) {
+				// Use raw gist URL for fetching content (gistpreview URLs return wrapper HTML)
+				return 'https://gist.githubusercontent.com/raw/' + gistId + '/' + filename;
+			}
+		}
+		return filename;
+	}
+
+	function getPageLink(pageNum, hash) {
+		const filename = 'page-' + String(pageNum).padStart(3, '0') + '.html';
+		if (window.location.hostname.includes('gistpreview.github.io')) {
+			const search = window.location.search.slice(1);
+			const gistId = search.split('/')[0];
+			if (gistId) {
+				return '?' + gistId + '/' + filename + (hash || '');
+			}
+		}
+		return filename + (hash || '');
+	}
+
 	function openModal(query) {
 		modal.showModal();
 		modalInput.value = query || '';
@@ -487,7 +513,7 @@ func (g *Generator) getSearchJS(totalPages int) string {
 		for (let i = 1; i <= totalPages; i++) {
 			searchStatus.textContent = 'Searching page ' + i + ' of ' + totalPages + '...';
 			try {
-				const resp = await fetch('page-' + String(i).padStart(3, '0') + '.html');
+				const resp = await fetch(getPageUrl(i));
 				const html = await resp.text();
 				const doc = new DOMParser().parseFromString(html, 'text/html');
 				const messages = doc.querySelectorAll('.message');
@@ -496,8 +522,9 @@ func (g *Generator) getSearchJS(totalPages int) string {
 					if (msg.textContent.toLowerCase().includes(query.toLowerCase())) {
 						const clone = msg.cloneNode(true);
 						clone.querySelectorAll('a').forEach((a) => {
-							if (a.href.startsWith('#')) {
-								a.href = 'page-' + String(i).padStart(3, '0') + '.html' + a.getAttribute('href');
+							const href = a.getAttribute('href');
+							if (href && href.startsWith('#')) {
+								a.href = getPageLink(i, href);
 							}
 						});
 						results.push({page: i, html: clone.outerHTML});

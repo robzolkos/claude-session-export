@@ -171,6 +171,61 @@ func TestExtractGistID(t *testing.T) {
 	}
 }
 
+func TestReorderArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "flags after file",
+			input:    []string{"file.jsonl", "--gist", "--open"},
+			expected: []string{"--gist", "--open", "file.jsonl"},
+		},
+		{
+			name:     "flags before file",
+			input:    []string{"--gist", "--open", "file.jsonl"},
+			expected: []string{"--gist", "--open", "file.jsonl"},
+		},
+		{
+			name:     "flag with value",
+			input:    []string{"-o", "outdir", "file.jsonl"},
+			expected: []string{"-o", "outdir", "file.jsonl"},
+		},
+		{
+			name:     "flag with value after file",
+			input:    []string{"file.jsonl", "-o", "outdir"},
+			expected: []string{"-o", "outdir", "file.jsonl"},
+		},
+		{
+			name:     "mixed flags and file",
+			input:    []string{"--quiet", "file.jsonl", "--gist", "-o", "dir"},
+			expected: []string{"--quiet", "--gist", "-o", "dir", "file.jsonl"},
+		},
+		{
+			name:     "flag with equals",
+			input:    []string{"file.jsonl", "--output=dir"},
+			expected: []string{"--output=dir", "file.jsonl"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := reorderArgs(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Errorf("reorderArgs(%v) = %v, expected %v", tt.input, result, tt.expected)
+				return
+			}
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("reorderArgs(%v) = %v, expected %v", tt.input, result, tt.expected)
+					return
+				}
+			}
+		})
+	}
+}
+
 func TestRun_All_NoSessions(t *testing.T) {
 	// Create a temporary home directory without any Claude sessions
 	tmpHome, err := os.MkdirTemp("", "home-*")
