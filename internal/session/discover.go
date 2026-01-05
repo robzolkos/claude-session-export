@@ -208,3 +208,154 @@ func LoadSessionSummaries(sessions []SessionInfo) {
 		}
 	}
 }
+
+// SearchMatch represents a single match within a session
+type SearchMatch struct {
+	Text    string // The matching text with context
+	Context string // "user" or "assistant"
+}
+
+// SearchResult represents search results for a single session
+type SearchResult struct {
+	SessionInfo SessionInfo
+	Matches     []SearchMatch
+}
+
+// SearchSessions searches all sessions for a query string
+func SearchSessions(query string) ([]SearchResult, error) {
+	projectsDir, err := GetClaudeProjectsDir()
+	if err != nil {
+		return nil, err
+	}
+
+	query = strings.ToLower(query)
+	var results []SearchResult
+
+	err = filepath.WalkDir(projectsDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if !strings.HasSuffix(path, ".jsonl") {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+
+		// Search this session file
+		matches, err := searchSessionFile(path, query)
+		if err != nil || len(matches) == 0 {
+			return nil
+		}
+
+		// Get project name from path
+		rel, _ := filepath.Rel(projectsDir, path)
+		parts := strings.Split(rel, string(filepath.Separator))
+		projectName := ""
+		if len(parts) > 1 {
+			projectName = parts[0]
+		}
+
+		sessionID := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+
+		results = append(results, SearchResult{
+			SessionInfo: SessionInfo{
+				Path:        path,
+				ProjectName: projectName,
+				SessionID:   sessionID,
+				ModTime:     info.ModTime(),
+				Size:        info.Size(),
+			},
+			Matches: matches,
+		})
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("searching sessions: %w", err)
+	}
+
+	// Sort by modification time (newest first)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].SessionInfo.ModTime.After(results[j].SessionInfo.ModTime)
+	})
+
+	return results, nil
+}
+
+// searchSessionFile searches a single session file for the query
+func searchSessionFile(path, query string) ([]SearchMatch, error) {
+	session, err := ParseFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var matches []SearchMatch
+
+	for _, msg := range session.Messages {
+		text := ExtractText(&msg)
+		textLower := strings.ToLower(text)
+
+		if strings.Contains(textLower, query) {
+			// Find the match and extract context
+			snippet := extractSnippet(text, query, 60)
+			if snippet != "" {
+				matches = append(matches, SearchMatch{
+					Text:    snippet,
+					Context: msg.Role,
+				})
+			}
+		}
+	}
+
+	return matches, nil
+}
+
+// extractSnippet extracts a snippet around the query match
+func extractSnippet(text, query string, contextChars int) string {
+	textLower := strings.ToLower(text)
+	queryLower := strings.ToLower(query)
+
+	idx := strings.Index(textLower, queryLower)
+	if idx == -1 {
+		return ""
+	}
+
+	start := idx - contextChars
+	if start < 0 {
+		start = 0
+	}
+
+	end := idx + len(query) + contextChars
+	if end > len(text) {
+		end = len(text)
+	}
+
+	snippet := text[start:end]
+
+	// Clean up whitespace
+	snippet = strings.ReplaceAll(snippet, "\n", " ")
+	snippet = strings.ReplaceAll(snippet, "\t", " ")
+	for strings.Contains(snippet, "  ") {
+		snippet = strings.ReplaceAll(snippet, "  ", " ")
+	}
+	snippet = strings.TrimSpace(snippet)
+
+	// Add ellipsis
+	if start > 0 {
+		snippet = "..." + snippet
+	}
+	if end < len(text) {
+		snippet = snippet + "..."
+	}
+
+	return snippet
+}

@@ -116,6 +116,33 @@ claude-session-export all -o ./my-archive
 claude-session-export all -o ./archive --quiet
 ```
 
+### `search`
+
+Search across all your Claude Code sessions for a specific term. Results show matching snippets and allow you to select a session to export.
+
+```bash
+# Search for a term across all sessions
+claude-session-export search "burrito"
+
+# Example output:
+# Found "burrito" in 3 sessions:
+#
+#  1. [Jan 05] -home-rzolkos-code-myapp (2 matches)
+#     "...let's grab a burrito for lunch and then..."
+#     "...the burrito API endpoint needs..."
+#
+#  2. [Jan 03] -home-rzolkos-code-backend (1 match)
+#     "...like wrapping a burrito, we need to..."
+#
+# Enter number to export (or q to quit):
+
+# Search and immediately open the exported result
+claude-session-export search "database migration" --open
+
+# Limit the number of snippet previews per session
+claude-session-export search "refactor" --max-matches 5
+```
+
 ## Command Line Options
 
 | Option | Short | Description |
@@ -127,6 +154,7 @@ claude-session-export all -o ./archive --quiet
 | `--include-json` | | Include original JSON/JSONL file in output |
 | `--quiet` | | Suppress all non-error output |
 | `--limit N` | | Maximum sessions to show in picker (default: 20) |
+| `--max-matches N` | | Maximum snippets to show per session in search (default: 3) |
 | `--help` | `-h` | Show help message |
 | `--version` | `-v` | Show version number |
 
