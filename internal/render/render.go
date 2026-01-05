@@ -35,29 +35,101 @@ func RenderMessageWithAnchor(msg session.MessageEntry, anchorID string, opts *Re
 	roleClass := msg.Role
 	roleLabel := capitalizeFirst(msg.Role)
 
-	timestamp := ""
-	if !msg.Timestamp.IsZero() {
-		timestamp = msg.Timestamp.Format(time.RFC3339)
-	}
-
 	if anchorID != "" {
 		buf.WriteString(fmt.Sprintf(`<div class="message %s" id="%s">`, roleClass, anchorID))
 	} else {
 		buf.WriteString(fmt.Sprintf(`<div class="message %s">`, roleClass))
 	}
-	buf.WriteString(fmt.Sprintf(`<div class="message-header">%s`, roleLabel))
-	if timestamp != "" {
-		buf.WriteString(fmt.Sprintf(` <span class="timestamp">%s</span>`, formatTimestamp(msg.Timestamp)))
+
+	// Message header with role, model, and timestamp
+	buf.WriteString(`<div class="message-header">`)
+	buf.WriteString(fmt.Sprintf(`<span class="role-label">%s</span>`, roleLabel))
+
+	// Show model name for assistant messages
+	if msg.Role == "assistant" && msg.Model != "" {
+		modelName := formatModelName(msg.Model)
+		buf.WriteString(fmt.Sprintf(`<span class="model-badge">%s</span>`, html.EscapeString(modelName)))
+	}
+
+	// Timestamp
+	if !msg.Timestamp.IsZero() {
+		buf.WriteString(fmt.Sprintf(`<span class="timestamp">%s</span>`, formatTimestamp(msg.Timestamp)))
 	}
 	buf.WriteString(`</div>`)
-	buf.WriteString(`<div class="message-content">`)
 
+	// Message content
+	buf.WriteString(`<div class="message-content">`)
 	for _, block := range msg.Content {
 		buf.WriteString(RenderContentBlock(block, opts))
 	}
+	buf.WriteString(`</div>`)
 
-	buf.WriteString(`</div></div>`)
+	// Token usage footer for assistant messages
+	if msg.Role == "assistant" && msg.Usage != nil {
+		buf.WriteString(renderTokenUsage(msg.Usage))
+	}
+
+	buf.WriteString(`</div>`)
 	return buf.String()
+}
+
+// formatModelName returns a shorter, cleaner model name
+func formatModelName(model string) string {
+	// Convert model IDs like "claude-opus-4-5-20251101" to "Opus 4.5"
+	// or "claude-haiku-4-5-20251001" to "Haiku 4.5"
+	model = strings.TrimPrefix(model, "claude-")
+
+	if strings.HasPrefix(model, "opus-4-5") {
+		return "Opus 4.5"
+	}
+	if strings.HasPrefix(model, "sonnet-4") {
+		return "Sonnet 4"
+	}
+	if strings.HasPrefix(model, "sonnet-3-5") || strings.HasPrefix(model, "3-5-sonnet") {
+		return "Sonnet 3.5"
+	}
+	if strings.HasPrefix(model, "haiku-4-5") {
+		return "Haiku 4.5"
+	}
+	if strings.HasPrefix(model, "haiku-3-5") || strings.HasPrefix(model, "3-5-haiku") {
+		return "Haiku 3.5"
+	}
+
+	// Fall back to showing the model string with some cleanup
+	parts := strings.Split(model, "-")
+	if len(parts) > 0 {
+		return capitalizeFirst(parts[0])
+	}
+	return model
+}
+
+// renderTokenUsage renders the token usage footer
+func renderTokenUsage(usage *session.TokenUsage) string {
+	var parts []string
+
+	if usage.InputTokens > 0 {
+		parts = append(parts, fmt.Sprintf(`<span class="token-in">↓%s in</span>`, formatTokenCount(usage.InputTokens)))
+	}
+	if usage.OutputTokens > 0 {
+		parts = append(parts, fmt.Sprintf(`<span class="token-out">↑%s out</span>`, formatTokenCount(usage.OutputTokens)))
+	}
+	if usage.CacheReadTokens > 0 {
+		parts = append(parts, fmt.Sprintf(`<span class="token-cache">⚡%s cache</span>`, formatTokenCount(usage.CacheReadTokens)))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf(`<div class="token-usage">%s</div>`, strings.Join(parts, ""))
+}
+
+// formatTokenCount formats token counts with K suffix for thousands
+func formatTokenCount(count int) string {
+	if count >= 1000 {
+		return fmt.Sprintf("%.1fK", float64(count)/1000)
+	}
+	return fmt.Sprintf("%d", count)
 }
 
 // RenderContentBlock renders a content block to HTML

@@ -320,12 +320,12 @@ func TestGenerator_SearchJS(t *testing.T) {
 func TestGetCSS(t *testing.T) {
 	css := getCSS()
 
-	// Check for key CSS components
+	// Check for key CSS components (cyberpunk theme variables)
 	checks := []string{
-		"--user-bg",
-		"--assistant-bg",
-		"--thinking-bg",
-		"--tool-bg",
+		"--bg-primary",
+		"--neon-cyan",
+		"--neon-pink",
+		"--text-primary",
 		".message",
 		".pagination",
 		".tool-block",

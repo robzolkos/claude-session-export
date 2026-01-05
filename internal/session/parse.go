@@ -110,6 +110,8 @@ func parseJSON(data []byte) (*Session, error) {
 	if msg.NestedMessage != nil {
 		msg.Role = msg.NestedMessage.Role
 		msg.RawContent = msg.NestedMessage.RawContent
+		msg.Model = msg.NestedMessage.Model
+		msg.Usage = msg.NestedMessage.Usage
 	}
 
 	// Skip if no valid role
@@ -149,6 +151,8 @@ func parseJSONL(data []byte) (*Session, error) {
 			// Use nested message's role and content
 			msg.Role = msg.NestedMessage.Role
 			msg.RawContent = msg.NestedMessage.RawContent
+			msg.Model = msg.NestedMessage.Model
+			msg.Usage = msg.NestedMessage.Usage
 		}
 
 		// Skip non-message types (file-history-snapshot, queue-operation, summary, etc.)
@@ -173,6 +177,10 @@ func parseJSONL(data []byte) (*Session, error) {
 	if err := parseMessages(session); err != nil {
 		return nil, err
 	}
+
+	// Build session metadata
+	session.Metadata = buildSessionMetadata(session)
+
 	return session, nil
 }
 
@@ -258,6 +266,8 @@ func GroupConversations(session *Session) []Conversation {
 					Role:      msg.Role,
 					Content:   msg.Content,
 					Timestamp: msg.Timestamp,
+					Model:     msg.Model,
+					Usage:     msg.Usage,
 				}},
 			}
 		} else if current != nil {
@@ -265,6 +275,8 @@ func GroupConversations(session *Session) []Conversation {
 				Role:      msg.Role,
 				Content:   msg.Content,
 				Timestamp: msg.Timestamp,
+				Model:     msg.Model,
+				Usage:     msg.Usage,
 			})
 		}
 	}
@@ -396,4 +408,38 @@ func GetFirstUserMessage(session *Session) string {
 		}
 	}
 	return ""
+}
+
+// buildSessionMetadata extracts metadata from session messages
+func buildSessionMetadata(session *Session) *SessionMetadata {
+	meta := &SessionMetadata{}
+	modelSet := make(map[string]bool)
+
+	for _, msg := range session.Messages {
+		// Extract cwd, gitBranch, version from first message that has them
+		if meta.Cwd == "" && msg.Cwd != "" {
+			meta.Cwd = msg.Cwd
+		}
+		if meta.GitBranch == "" && msg.GitBranch != "" {
+			meta.GitBranch = msg.GitBranch
+		}
+		if meta.Version == "" && msg.Version != "" {
+			meta.Version = msg.Version
+		}
+
+		// Collect model names
+		if msg.Model != "" && !modelSet[msg.Model] {
+			modelSet[msg.Model] = true
+			meta.Models = append(meta.Models, msg.Model)
+		}
+
+		// Aggregate token usage
+		if msg.Usage != nil {
+			meta.TotalInput += msg.Usage.InputTokens
+			meta.TotalOutput += msg.Usage.OutputTokens
+			meta.TotalCache += msg.Usage.CacheReadTokens
+		}
+	}
+
+	return meta
 }

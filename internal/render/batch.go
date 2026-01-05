@@ -196,94 +196,170 @@ func wrapArchiveHTML(title, content string) string {
 
 func getArchiveCSS() string {
 	return `
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
 :root {
-	--bg-color: #ffffff;
-	--text-color: #333333;
-	--link-color: #1976d2;
-	--border-color: #e0e0e0;
-	--hover-bg: #f5f5f5;
-	--text-muted: #757575;
+	--bg-primary: #0a0a0f;
+	--bg-secondary: #12121a;
+	--bg-tertiary: #1a1a24;
+	--bg-elevated: #22222e;
+
+	--neon-pink: #ff0080;
+	--neon-cyan: #00f0ff;
+	--neon-green: #39ff14;
+	--neon-orange: #ff6600;
+	--neon-purple: #bf00ff;
+
+	--text-primary: #e8e8ef;
+	--text-secondary: #9898a8;
+	--text-muted: #5c5c6e;
+
+	--glow-cyan: 0 0 20px rgba(0, 240, 255, 0.4);
+	--glow-pink: 0 0 20px rgba(255, 0, 128, 0.4);
+
+	--border-subtle: rgba(255, 255, 255, 0.06);
+}
+
+* {
+	box-sizing: border-box;
 }
 
 body {
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-	line-height: 1.6;
-	color: var(--text-color);
-	background: var(--bg-color);
+	font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+	font-weight: 400;
+	line-height: 1.7;
+	color: var(--text-primary);
+	background: var(--bg-primary);
 	margin: 0;
-	padding: 20px;
+	padding: 24px;
+	min-height: 100vh;
+	background-image:
+		radial-gradient(ellipse at 20% 0%, rgba(191, 0, 255, 0.08) 0%, transparent 50%),
+		radial-gradient(ellipse at 80% 100%, rgba(0, 240, 255, 0.06) 0%, transparent 50%);
 }
 
 .container {
-	max-width: 900px;
+	max-width: 960px;
 	margin: 0 auto;
 }
 
 h1 {
-	margin-bottom: 10px;
+	font-weight: 600;
+	font-size: 1.75rem;
+	margin: 0 0 8px 0;
+	background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-pink) 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+	letter-spacing: -0.02em;
 }
 
 h1 a {
-	color: inherit;
+	background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-pink) 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
 	text-decoration: none;
 }
 
-h1 a:hover {
-	text-decoration: underline;
-}
-
 .stats {
-	color: var(--text-muted);
-	margin-bottom: 20px;
+	color: var(--text-secondary);
+	font-size: 0.875rem;
+	margin-bottom: 24px;
+	padding: 12px 16px;
+	background: var(--bg-secondary);
+	border-radius: 8px;
+	border: 1px solid var(--border-subtle);
+	display: inline-block;
 }
 
 .index-items {
-	margin: 20px 0;
+	margin: 24px 0;
 }
 
 .index-item {
 	display: block;
-	padding: 15px;
-	border: 1px solid var(--border-color);
-	border-radius: 8px;
-	margin-bottom: 10px;
+	padding: 20px;
+	border: 1px solid var(--border-subtle);
+	border-radius: 12px;
+	margin-bottom: 12px;
 	text-decoration: none;
 	color: inherit;
+	background: var(--bg-secondary);
+	transition: all 0.2s ease;
 }
 
 .index-item:hover {
-	background: var(--hover-bg);
+	border-color: rgba(0, 240, 255, 0.3);
+	background: var(--bg-tertiary);
+	transform: translateX(4px);
 }
 
 .index-item-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+	gap: 16px;
 }
 
 .project-name, .session-date {
-	font-weight: bold;
-	color: var(--link-color);
+	font-weight: 600;
+	color: var(--neon-cyan);
 }
 
 .project-date, .session-size {
 	color: var(--text-muted);
-	font-size: 0.9em;
+	font-size: 0.8rem;
+	font-family: 'JetBrains Mono', monospace;
 }
 
 .project-stats, .session-summary {
-	color: var(--text-muted);
-	font-size: 0.9em;
-	margin-top: 5px;
+	color: var(--text-secondary);
+	font-size: 0.85rem;
+	margin-top: 8px;
 }
 
 .back-link {
-	color: var(--link-color);
+	color: var(--neon-cyan);
 	text-decoration: none;
+	font-weight: 500;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 0;
+	transition: all 0.2s ease;
 }
 
 .back-link:hover {
-	text-decoration: underline;
+	text-shadow: var(--glow-cyan);
+}
+
+a {
+	color: var(--neon-cyan);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--bg-elevated);
+	border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
+}
+
+::selection {
+	background: rgba(0, 240, 255, 0.3);
+	color: var(--text-primary);
 }
 `
 }
