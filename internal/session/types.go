@@ -7,7 +7,8 @@ import (
 
 // Session represents a Claude Code session
 type Session struct {
-	Messages []Message `json:"messages"`
+	Messages []Message        `json:"messages"`
+	Metadata *SessionMetadata `json:"-"`
 }
 
 // Message represents a single message in the conversation
@@ -21,12 +22,23 @@ type Message struct {
 
 	// New Claude Code format: message is nested
 	NestedMessage *NestedMessage `json:"message,omitempty"`
+
+	// Session metadata (from top-level fields)
+	Cwd       string `json:"cwd,omitempty"`
+	GitBranch string `json:"gitBranch,omitempty"`
+	Version   string `json:"version,omitempty"`
+
+	// Model and usage (extracted from nested message)
+	Model string
+	Usage *TokenUsage
 }
 
 // NestedMessage represents the nested message in new Claude Code format
 type NestedMessage struct {
 	Role       string          `json:"role"`
 	RawContent json.RawMessage `json:"content"`
+	Model      string          `json:"model,omitempty"`
+	Usage      *TokenUsage     `json:"usage,omitempty"`
 }
 
 // Content can be a string or array of content blocks
@@ -86,6 +98,30 @@ type MessageEntry struct {
 	Role      string
 	Content   Content
 	Timestamp time.Time
+	Model     string
+	Usage     *TokenUsage
+}
+
+// TokenUsage represents token usage statistics for a message
+type TokenUsage struct {
+	InputTokens      int `json:"input_tokens"`
+	OutputTokens     int `json:"output_tokens"`
+	CacheReadTokens  int `json:"cache_read_input_tokens"`
+	CacheWriteTokens int `json:"cache_creation_input_tokens"`
+}
+
+// SessionMetadata contains metadata about the session
+type SessionMetadata struct {
+	Cwd         string
+	GitBranch   string
+	Version     string
+	Models      []string
+	TotalInput  int
+	TotalOutput int
+	TotalCache  int
+	StartTime   time.Time
+	EndTime     time.Time
+	ActiveTime  time.Duration // Time excluding gaps > threshold
 }
 
 // ToolStats tracks statistics about tool usage

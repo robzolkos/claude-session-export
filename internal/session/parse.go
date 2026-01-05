@@ -110,6 +110,8 @@ func parseJSON(data []byte) (*Session, error) {
 	if msg.NestedMessage != nil {
 		msg.Role = msg.NestedMessage.Role
 		msg.RawContent = msg.NestedMessage.RawContent
+		msg.Model = msg.NestedMessage.Model
+		msg.Usage = msg.NestedMessage.Usage
 	}
 
 	// Skip if no valid role
@@ -149,6 +151,8 @@ func parseJSONL(data []byte) (*Session, error) {
 			// Use nested message's role and content
 			msg.Role = msg.NestedMessage.Role
 			msg.RawContent = msg.NestedMessage.RawContent
+			msg.Model = msg.NestedMessage.Model
+			msg.Usage = msg.NestedMessage.Usage
 		}
 
 		// Skip non-message types (file-history-snapshot, queue-operation, summary, etc.)
@@ -173,6 +177,10 @@ func parseJSONL(data []byte) (*Session, error) {
 	if err := parseMessages(session); err != nil {
 		return nil, err
 	}
+
+	// Build session metadata
+	session.Metadata = buildSessionMetadata(session)
+
 	return session, nil
 }
 
@@ -258,6 +266,8 @@ func GroupConversations(session *Session) []Conversation {
 					Role:      msg.Role,
 					Content:   msg.Content,
 					Timestamp: msg.Timestamp,
+					Model:     msg.Model,
+					Usage:     msg.Usage,
 				}},
 			}
 		} else if current != nil {
@@ -265,6 +275,8 @@ func GroupConversations(session *Session) []Conversation {
 				Role:      msg.Role,
 				Content:   msg.Content,
 				Timestamp: msg.Timestamp,
+				Model:     msg.Model,
+				Usage:     msg.Usage,
 			})
 		}
 	}
@@ -396,4 +408,82 @@ func GetFirstUserMessage(session *Session) string {
 		}
 	}
 	return ""
+}
+
+// buildSessionMetadata extracts metadata from session messages
+func buildSessionMetadata(session *Session) *SessionMetadata {
+	meta := &SessionMetadata{}
+	modelSet := make(map[string]bool)
+
+	// Track message indices and timestamps for duration calculation
+	type msgInfo struct {
+		timestamp time.Time
+		isUser    bool
+	}
+	var messages []msgInfo
+
+	for _, msg := range session.Messages {
+		// Extract cwd, gitBranch, version from first message that has them
+		if meta.Cwd == "" && msg.Cwd != "" {
+			meta.Cwd = msg.Cwd
+		}
+		if meta.GitBranch == "" && msg.GitBranch != "" {
+			meta.GitBranch = msg.GitBranch
+		}
+		if meta.Version == "" && msg.Version != "" {
+			meta.Version = msg.Version
+		}
+
+		// Collect model names
+		if msg.Model != "" && !modelSet[msg.Model] {
+			modelSet[msg.Model] = true
+			meta.Models = append(meta.Models, msg.Model)
+		}
+
+		// Aggregate token usage
+		if msg.Usage != nil {
+			meta.TotalInput += msg.Usage.InputTokens
+			meta.TotalOutput += msg.Usage.OutputTokens
+			meta.TotalCache += msg.Usage.CacheReadTokens
+		}
+
+		// Collect valid timestamps with role info
+		if !msg.Timestamp.IsZero() {
+			messages = append(messages, msgInfo{
+				timestamp: msg.Timestamp,
+				isUser:    msg.Role == "user",
+			})
+		}
+	}
+
+	// Calculate session duration
+	// Active time = sum of time from each user message to the message before the next user message
+	// This captures time when user was actively engaged (waiting for/reading responses)
+	if len(messages) > 0 {
+		meta.StartTime = messages[0].timestamp
+		meta.EndTime = messages[len(messages)-1].timestamp
+
+		var activeTime time.Duration
+		var lastUserIdx int = -1
+
+		for i, m := range messages {
+			if m.isUser {
+				// If we have a previous user message, calculate active time
+				// from that user message to the message just before this one
+				if lastUserIdx >= 0 && i > 0 {
+					activeTime += messages[i-1].timestamp.Sub(messages[lastUserIdx].timestamp)
+				}
+				lastUserIdx = i
+			}
+		}
+
+		// Don't forget the last segment: from last user message to end
+		if lastUserIdx >= 0 && lastUserIdx < len(messages)-1 {
+			activeTime += messages[len(messages)-1].timestamp.Sub(messages[lastUserIdx].timestamp)
+		}
+
+		meta.ActiveTime = activeTime
+	}
+
+	return meta
 }
