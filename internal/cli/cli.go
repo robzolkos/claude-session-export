@@ -18,7 +18,7 @@ import (
 	"github.com/robzolkos/claude-session-export/internal/web"
 )
 
-const version = "0.1.0"
+var version = "dev"
 
 // Run executes the CLI with the given arguments
 func Run(args []string) error {
