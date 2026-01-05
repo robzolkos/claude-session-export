@@ -2,7 +2,14 @@
 
 A fast, lightweight Go CLI tool that transforms Claude Code session files into shareable, searchable HTML documentation.
 
-Inspired by [simonw/claude-code-transcripts](https://github.com/simonw/claude-code-transcripts).
+Inspired by [simonw/claude-code-transcripts](https://github.com/simonw/claude-code-transcripts). This project adds:
+
+- Zero external dependencies (single Go binary)
+- Built-in full-text search across transcript pages
+- CLI search command to find terms across all sessions
+- Session duration tracking
+- Gists are private by default with `--public` flag option
+- Synthwave 84 styling
 
 ## Features
 
