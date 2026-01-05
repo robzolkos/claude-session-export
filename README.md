@@ -27,6 +27,13 @@ Inspired by [simonw/claude-code-transcripts](https://github.com/simonw/claude-co
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap robzolkos/tap
+brew install claude-session-export
+```
+
 ### Using Go Install
 
 ```bash

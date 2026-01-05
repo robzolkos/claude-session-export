@@ -28,3 +28,14 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
+
+brews:
+  - repository:
+      owner: robzolkos
+      name: homebrew-tap
+    homepage: "https://github.com/robzolkos/claude-session-export"
+    description: "Transform Claude Code sessions into shareable HTML documentation"
+    license: "Apache-2.0"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
