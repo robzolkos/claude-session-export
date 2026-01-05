@@ -61,7 +61,8 @@ COMMANDS:
 
 OPTIONS:
     -o, --output DIR     Output directory (default: temp directory)
-    --gist               Upload to GitHub Gist
+    --gist               Upload to GitHub Gist (private by default)
+    --public             Make gist public (use with --gist)
     --open               Open in browser when done
     --include-json       Include original JSON/JSONL file
     --quiet              Suppress output
@@ -80,6 +81,7 @@ func runLocal(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	publicGist := fs.Bool("public", false, "Make gist public")
 	openBrowser := fs.Bool("open", false, "Open in browser when done")
 	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
 	quiet := fs.Bool("quiet", false, "Suppress output")
@@ -108,7 +110,7 @@ func runLocal(args []string) error {
 		return err
 	}
 
-	return convertSession(selected.Path, *outputDir, *uploadGist, *openBrowser, *includeJSON, *quiet)
+	return convertSession(selected.Path, *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
 }
 
 func runJSON(args []string) error {
@@ -116,6 +118,7 @@ func runJSON(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	publicGist := fs.Bool("public", false, "Make gist public")
 	openBrowser := fs.Bool("open", false, "Open in browser when done")
 	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
 	quiet := fs.Bool("quiet", false, "Suppress output")
@@ -132,10 +135,10 @@ func runJSON(args []string) error {
 
 	// Check if it's a URL
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-		return convertURL(path, *outputDir, *uploadGist, *openBrowser, *quiet)
+		return convertURL(path, *outputDir, *uploadGist, *publicGist, *openBrowser, *quiet)
 	}
 
-	return convertSession(path, *outputDir, *uploadGist, *openBrowser, *includeJSON, *quiet)
+	return convertSession(path, *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
 }
 
 func runWeb(args []string) error {
@@ -143,6 +146,7 @@ func runWeb(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	publicGist := fs.Bool("public", false, "Make gist public")
 	openBrowser := fs.Bool("open", false, "Open in browser when done")
 	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
 	quiet := fs.Bool("quiet", false, "Suppress output")
@@ -179,7 +183,7 @@ func runWeb(args []string) error {
 	}
 	tmpFile.Close()
 
-	return convertSession(tmpFile.Name(), *outputDir, *uploadGist, *openBrowser, *includeJSON, *quiet)
+	return convertSession(tmpFile.Name(), *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
 }
 
 func runAll(args []string) error {
@@ -243,7 +247,7 @@ func runAll(args []string) error {
 	return nil
 }
 
-func convertSession(path, outputDir string, uploadGist, openBrowser, includeJSON, quiet bool) error {
+func convertSession(path, outputDir string, uploadGist, publicGist, openBrowser, includeJSON, quiet bool) error {
 	// Parse session
 	sess, err := session.ParseFile(path)
 	if err != nil {
@@ -276,11 +280,15 @@ func convertSession(path, outputDir string, uploadGist, openBrowser, includeJSON
 
 	if uploadGist {
 		// Upload to GitHub Gist
+		visibility := "private"
+		if publicGist {
+			visibility = "public"
+		}
 		if !quiet {
-			fmt.Println("Uploading to GitHub Gist...")
+			fmt.Printf("Uploading to GitHub Gist (%s)...\n", visibility)
 		}
 
-		gistURL, err := gist.Upload(outDir)
+		gistURL, err := gist.Upload(outDir, publicGist)
 		if err != nil {
 			return fmt.Errorf("uploading gist: %w", err)
 		}
@@ -307,7 +315,7 @@ func convertSession(path, outputDir string, uploadGist, openBrowser, includeJSON
 	return nil
 }
 
-func convertURL(url, outputDir string, uploadGist, openBrowser, quiet bool) error {
+func convertURL(url, outputDir string, uploadGist, publicGist, openBrowser, quiet bool) error {
 	if !quiet {
 		fmt.Printf("Fetching %s...\n", url)
 	}
@@ -339,7 +347,7 @@ func convertURL(url, outputDir string, uploadGist, openBrowser, quiet bool) erro
 	}
 	tmpFile.Close()
 
-	return convertSession(tmpFile.Name(), outputDir, uploadGist, openBrowser, false, quiet)
+	return convertSession(tmpFile.Name(), outputDir, uploadGist, publicGist, openBrowser, false, quiet)
 }
 
 func selectSession(sessions []session.SessionInfo) (*session.SessionInfo, error) {
