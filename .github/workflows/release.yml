@@ -32,3 +32,90 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  aur:
+    name: Update AUR Package
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download checksums
+        run: |
+          curl -sL "https://github.com/robzolkos/claude-session-export/releases/download/v${{ steps.version.outputs.VERSION }}/claude-session-export_${{ steps.version.outputs.VERSION }}_checksums.txt" -o checksums.txt
+          echo "SHA256_X86_64=$(grep linux_amd64 checksums.txt | cut -d' ' -f1)" >> $GITHUB_ENV
+          echo "SHA256_AARCH64=$(grep linux_arm64 checksums.txt | cut -d' ' -f1)" >> $GITHUB_ENV
+
+      - name: Generate PKGBUILD
+        run: |
+          cat > PKGBUILD << 'EOF'
+          # Maintainer: Rob Zolkos <rob@zolkos.com>
+          pkgname=claude-session-export-bin
+          pkgver=${{ steps.version.outputs.VERSION }}
+          pkgrel=1
+          pkgdesc="Transform Claude Code sessions into shareable HTML documentation"
+          arch=('x86_64' 'aarch64')
+          url="https://github.com/robzolkos/claude-session-export"
+          license=('Apache-2.0')
+          provides=('claude-session-export')
+          conflicts=('claude-session-export')
+
+          source_x86_64=("${pkgname}-${pkgver}-x86_64.tar.gz::https://github.com/robzolkos/claude-session-export/releases/download/v${pkgver}/claude-session-export_${pkgver}_linux_amd64.tar.gz")
+          source_aarch64=("${pkgname}-${pkgver}-aarch64.tar.gz::https://github.com/robzolkos/claude-session-export/releases/download/v${pkgver}/claude-session-export_${pkgver}_linux_arm64.tar.gz")
+
+          sha256sums_x86_64=('${{ env.SHA256_X86_64 }}')
+          sha256sums_aarch64=('${{ env.SHA256_AARCH64 }}')
+
+          package() {
+              install -Dm755 claude-session-export "${pkgdir}/usr/bin/claude-session-export"
+          }
+          EOF
+
+      - name: Generate .SRCINFO
+        run: |
+          cat > .SRCINFO << EOF
+          pkgbase = claude-session-export-bin
+          	pkgdesc = Transform Claude Code sessions into shareable HTML documentation
+          	pkgver = ${{ steps.version.outputs.VERSION }}
+          	pkgrel = 1
+          	url = https://github.com/robzolkos/claude-session-export
+          	arch = x86_64
+          	arch = aarch64
+          	license = Apache-2.0
+          	provides = claude-session-export
+          	conflicts = claude-session-export
+          	source_x86_64 = claude-session-export-bin-${{ steps.version.outputs.VERSION }}-x86_64.tar.gz::https://github.com/robzolkos/claude-session-export/releases/download/v${{ steps.version.outputs.VERSION }}/claude-session-export_${{ steps.version.outputs.VERSION }}_linux_amd64.tar.gz
+          	sha256sums_x86_64 = ${{ env.SHA256_X86_64 }}
+          	source_aarch64 = claude-session-export-bin-${{ steps.version.outputs.VERSION }}-aarch64.tar.gz::https://github.com/robzolkos/claude-session-export/releases/download/v${{ steps.version.outputs.VERSION }}/claude-session-export_${{ steps.version.outputs.VERSION }}_linux_arm64.tar.gz
+          	sha256sums_aarch64 = ${{ env.SHA256_AARCH64 }}
+
+          pkgname = claude-session-export-bin
+          EOF
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            User aur
+          EOF
+
+      - name: Push to AUR
+        run: |
+          git clone ssh://aur@aur.archlinux.org/claude-session-export-bin.git aur-repo
+          cp PKGBUILD .SRCINFO aur-repo/
+          cd aur-repo
+          git config user.email "rob@zolkos.com"
+          git config user.name "Rob Zolkos"
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update to v${{ steps.version.outputs.VERSION }}"
+          git push
