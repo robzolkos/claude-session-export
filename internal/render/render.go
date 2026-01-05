@@ -282,11 +282,17 @@ func renderCommitCard(hash, message string, opts *RenderOptions) string {
 	buf.WriteString(`<div class="commit-card">`)
 	buf.WriteString(`<span class="commit-icon">📦</span>`)
 
+	// Safely truncate hash to 7 characters for display
+	hashDisplay := hash
+	if len(hash) > 7 {
+		hashDisplay = hash[:7]
+	}
+
 	if opts != nil && opts.RepoURL != "" {
 		commitURL := fmt.Sprintf("%s/commit/%s", opts.RepoURL, hash)
-		buf.WriteString(fmt.Sprintf(`<a href="%s" class="commit-hash">%s</a>`, commitURL, hash[:7]))
+		buf.WriteString(fmt.Sprintf(`<a href="%s" class="commit-hash">%s</a>`, commitURL, hashDisplay))
 	} else {
-		buf.WriteString(fmt.Sprintf(`<span class="commit-hash">%s</span>`, hash[:7]))
+		buf.WriteString(fmt.Sprintf(`<span class="commit-hash">%s</span>`, hashDisplay))
 	}
 
 	buf.WriteString(fmt.Sprintf(` <span class="commit-message">%s</span>`, html.EscapeString(message)))
