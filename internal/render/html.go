@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html"
 	"os"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/robzolkos/claude-session-export/internal/session"
 )
+
+// ErrNoConversations is returned when a session has no conversations to render
+var ErrNoConversations = errors.New("no conversations found in session")
 
 // Generator generates HTML output for a session
 type Generator struct {
@@ -52,7 +56,7 @@ func (g *Generator) Generate() error {
 	// Group into conversations
 	conversations := session.GroupConversations(g.Session)
 	if len(conversations) == 0 {
-		return fmt.Errorf("no conversations found in session")
+		return ErrNoConversations
 	}
 
 	// Calculate pages
