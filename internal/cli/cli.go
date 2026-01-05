@@ -35,6 +35,8 @@ func Run(args []string) error {
 		return runWeb(args[1:])
 	case "all":
 		return runAll(args[1:])
+	case "search":
+		return runSearch(args[1:])
 	case "version", "--version", "-v":
 		fmt.Printf("claude-session-export %s\n", version)
 		return nil
@@ -58,6 +60,7 @@ COMMANDS:
     json     Export a specific JSON or JSONL file
     web      Fetch and export sessions from Claude API
     all      Export all local sessions to a browsable archive
+    search   Search across all sessions for a term
 
 OPTIONS:
     -o, --output DIR     Output directory (default: temp directory)
@@ -73,7 +76,8 @@ EXAMPLES:
     claude-session-export                     # Interactive session picker
     claude-session-export json session.jsonl  # Convert specific file
     claude-session-export all --open          # Convert all sessions
-    claude-session-export web SESSION_ID      # Fetch from API`)
+    claude-session-export web SESSION_ID      # Fetch from API
+    claude-session-export search "burrito"    # Search all sessions`)
 }
 
 func runLocal(args []string) error {
@@ -245,6 +249,90 @@ func runAll(args []string) error {
 	}
 
 	return nil
+}
+
+func runSearch(args []string) error {
+	fs := flag.NewFlagSet("search", flag.ExitOnError)
+	outputDir := fs.String("o", "", "Output directory")
+	fs.StringVar(outputDir, "output", "", "Output directory")
+	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	publicGist := fs.Bool("public", false, "Make gist public")
+	openBrowser := fs.Bool("open", false, "Open in browser when done")
+	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
+	quiet := fs.Bool("quiet", false, "Suppress output")
+	maxMatches := fs.Int("max-matches", 3, "Maximum matches to show per session")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if fs.NArg() == 0 {
+		return errors.New("usage: claude-session-export search <query>")
+	}
+
+	query := fs.Arg(0)
+
+	if !*quiet {
+		fmt.Printf("Searching for \"%s\"...\n", query)
+	}
+
+	results, err := session.SearchSessions(query)
+	if err != nil {
+		return fmt.Errorf("searching sessions: %w", err)
+	}
+
+	if len(results) == 0 {
+		fmt.Printf("No sessions found containing \"%s\"\n", query)
+		return nil
+	}
+
+	// Display results with snippets
+	fmt.Printf("\nFound \"%s\" in %d sessions:\n\n", query, len(results))
+
+	for i, result := range results {
+		matchCount := len(result.Matches)
+		matchWord := "match"
+		if matchCount > 1 {
+			matchWord = "matches"
+		}
+		fmt.Printf("%2d. [%s] %s (%d %s)\n",
+			i+1,
+			result.SessionInfo.ModTime.Format("Jan 02"),
+			result.SessionInfo.ProjectName,
+			matchCount,
+			matchWord)
+
+		// Show up to maxMatches snippets
+		showCount := matchCount
+		if showCount > *maxMatches {
+			showCount = *maxMatches
+		}
+		for j := 0; j < showCount; j++ {
+			fmt.Printf("    \"%s\"\n", result.Matches[j].Text)
+		}
+		if matchCount > *maxMatches {
+			fmt.Printf("    ... and %d more matches\n", matchCount-*maxMatches)
+		}
+		fmt.Println()
+	}
+
+	// Interactive selection
+	fmt.Print("Enter number to export (or q to quit): ")
+
+	var input string
+	fmt.Scanln(&input)
+
+	if input == "q" || input == "Q" {
+		return nil
+	}
+
+	var idx int
+	if _, err := fmt.Sscanf(input, "%d", &idx); err != nil || idx < 1 || idx > len(results) {
+		return errors.New("invalid selection")
+	}
+
+	selected := results[idx-1].SessionInfo
+	return convertSession(selected.Path, *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
 }
 
 func convertSession(path, outputDir string, uploadGist, publicGist, openBrowser, includeJSON, quiet bool) error {
