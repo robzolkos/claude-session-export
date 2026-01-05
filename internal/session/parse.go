@@ -92,11 +92,32 @@ func parseJSON(data []byte) (*Session, error) {
 
 	// Try parsing as an array of messages directly
 	var messages []Message
-	if err := json.Unmarshal(data, &messages); err != nil {
+	if err := json.Unmarshal(data, &messages); err == nil {
+		session = Session{Messages: messages}
+		if err := parseMessages(&session); err != nil {
+			return nil, err
+		}
+		return &session, nil
+	}
+
+	// Try parsing as a single message object (new Claude Code format)
+	var msg Message
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return nil, fmt.Errorf("parsing JSON: %w", err)
 	}
 
-	session = Session{Messages: messages}
+	// Handle nested message format
+	if msg.NestedMessage != nil {
+		msg.Role = msg.NestedMessage.Role
+		msg.RawContent = msg.NestedMessage.RawContent
+	}
+
+	// Skip if no valid role
+	if msg.Role == "" {
+		return &Session{}, nil
+	}
+
+	session = Session{Messages: []Message{msg}}
 	if err := parseMessages(&session); err != nil {
 		return nil, err
 	}

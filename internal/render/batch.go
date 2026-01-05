@@ -62,6 +62,10 @@ func (g *BatchGenerator) generateProject(project session.ProjectInfo) error {
 		}
 
 		if err := gen.Generate(); err != nil {
+			// Skip sessions with no conversations silently (e.g., agent sessions with only assistant messages)
+			if err == ErrNoConversations {
+				continue
+			}
 			fmt.Fprintf(os.Stderr, "Warning: failed to generate session %s: %v\n", sess.SessionID, err)
 			continue
 		}
