@@ -123,8 +123,21 @@ func parseJSONL(data []byte) (*Session, error) {
 			continue
 		}
 
-		// Skip non-message types (like "summary" entries)
-		if msg.Type != "" && msg.Type != "message" {
+		// Handle new Claude Code format where message is nested
+		if msg.NestedMessage != nil {
+			// Use nested message's role and content
+			msg.Role = msg.NestedMessage.Role
+			msg.RawContent = msg.NestedMessage.RawContent
+		}
+
+		// Skip non-message types (file-history-snapshot, queue-operation, summary, etc.)
+		// Accept "user", "assistant", or empty type (old format)
+		if msg.Type != "" && msg.Type != "message" && msg.Type != "user" && msg.Type != "assistant" {
+			continue
+		}
+
+		// Skip messages without a role (shouldn't happen but just in case)
+		if msg.Role == "" {
 			continue
 		}
 
