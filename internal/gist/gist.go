@@ -30,7 +30,7 @@ type GistResponse struct {
 }
 
 // Upload uploads all files in a directory to GitHub Gist using gh CLI
-func Upload(dir string) (string, error) {
+func Upload(dir string, public bool) (string, error) {
 	// Check if gh CLI is available
 	if _, err := exec.LookPath("gh"); err != nil {
 		return "", errors.New("gh CLI not found. Install from https://cli.github.com/")
@@ -55,8 +55,11 @@ func Upload(dir string) (string, error) {
 		return "", errors.New("no files to upload")
 	}
 
-	// Build gh gist create command
-	args := []string{"gist", "create", "--public"}
+	// Build gh gist create command (private by default)
+	args := []string{"gist", "create"}
+	if public {
+		args = append(args, "--public")
+	}
 	for _, f := range files {
 		args = append(args, f)
 	}
@@ -88,7 +91,7 @@ func Upload(dir string) (string, error) {
 
 // UploadViaAPI uploads files to GitHub Gist using the API directly
 // Requires GITHUB_TOKEN environment variable
-func UploadViaAPI(dir string) (string, error) {
+func UploadViaAPI(dir string, public bool) (string, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return "", errors.New("GITHUB_TOKEN environment variable not set")
@@ -118,10 +121,10 @@ func UploadViaAPI(dir string) (string, error) {
 		return "", fmt.Errorf("reading files: %w", err)
 	}
 
-	// Create request
+	// Create request (private by default)
 	req := GistRequest{
 		Description: "Claude Code Transcript",
-		Public:      true,
+		Public:      public,
 		Files:       files,
 	}
 

@@ -79,8 +79,11 @@ claude-session-export json session.json -o ./my-transcript
 # Convert from URL
 claude-session-export json https://example.com/session.json
 
-# Upload result to GitHub Gist
+# Upload result to GitHub Gist (private by default)
 claude-session-export json session.jsonl --gist
+
+# Upload as a public gist
+claude-session-export json session.jsonl --gist --public
 
 # Include original session file in output
 claude-session-export json session.jsonl --include-json
@@ -118,7 +121,8 @@ claude-session-export all -o ./archive --quiet
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--output DIR` | `-o` | Output directory (defaults to temp directory) |
-| `--gist` | | Upload output to GitHub Gist |
+| `--gist` | | Upload output to GitHub Gist (private by default) |
+| `--public` | | Make gist public (use with --gist) |
 | `--open` | | Open result in browser when complete |
 | `--include-json` | | Include original JSON/JSONL file in output |
 | `--quiet` | | Suppress all non-error output |
