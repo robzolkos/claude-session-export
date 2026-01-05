@@ -318,6 +318,22 @@ go test ./... -v
 go build -o claude-session-export .
 ```
 
+### Releasing
+
+Releases are automated via GoReleaser and GitHub Actions. To create a new release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This triggers a GitHub Action that builds binaries for:
+- Linux (amd64, arm64)
+- macOS (amd64, arm64)
+- Windows (amd64, arm64)
+
+Binaries are automatically attached to the GitHub Release.
+
 ### Project Structure
 
 ```
