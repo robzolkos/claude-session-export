@@ -18,6 +18,15 @@ type Message struct {
 	RawContent   json.RawMessage `json:"content"`
 	Timestamp    time.Time       `json:"-"`
 	RawTimestamp string          `json:"timestamp"`
+
+	// New Claude Code format: message is nested
+	NestedMessage *NestedMessage `json:"message,omitempty"`
+}
+
+// NestedMessage represents the nested message in new Claude Code format
+type NestedMessage struct {
+	Role       string          `json:"role"`
+	RawContent json.RawMessage `json:"content"`
 }
 
 // Content can be a string or array of content blocks
