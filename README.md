@@ -34,6 +34,12 @@ brew tap robzolkos/tap
 brew install claude-session-export
 ```
 
+### Arch Linux (AUR)
+
+```bash
+yay -S claude-session-export-bin
+```
+
 ### Using Go Install
 
 ```bash
