@@ -33,6 +33,7 @@ brews:
   - repository:
       owner: robzolkos
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/robzolkos/claude-session-export"
     description: "Transform Claude Code sessions into shareable HTML documentation"
     license: "Apache-2.0"
