@@ -112,13 +112,16 @@ type TokenUsage struct {
 
 // SessionMetadata contains metadata about the session
 type SessionMetadata struct {
-	Cwd         string
-	GitBranch   string
-	Version     string
-	Models      []string
-	TotalInput  int
-	TotalOutput int
-	TotalCache  int
+	Cwd          string
+	GitBranch    string
+	Version      string
+	Models       []string
+	TotalInput   int
+	TotalOutput  int
+	TotalCache   int
+	StartTime    time.Time
+	EndTime      time.Time
+	ActiveTime   time.Duration // Time excluding gaps > threshold
 }
 
 // ToolStats tracks statistics about tool usage

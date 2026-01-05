@@ -33,7 +33,12 @@ func RenderMessageWithAnchor(msg session.MessageEntry, anchorID string, opts *Re
 	var buf bytes.Buffer
 
 	roleClass := msg.Role
-	roleLabel := capitalizeFirst(msg.Role)
+	roleEmoji := "👤"
+	roleLabel := "User"
+	if msg.Role == "assistant" {
+		roleEmoji = "🤖"
+		roleLabel = "Assistant"
+	}
 
 	if anchorID != "" {
 		buf.WriteString(fmt.Sprintf(`<div class="message %s" id="%s">`, roleClass, anchorID))
@@ -43,7 +48,7 @@ func RenderMessageWithAnchor(msg session.MessageEntry, anchorID string, opts *Re
 
 	// Message header with role, model, and timestamp
 	buf.WriteString(`<div class="message-header">`)
-	buf.WriteString(fmt.Sprintf(`<span class="role-label">%s</span>`, roleLabel))
+	buf.WriteString(fmt.Sprintf(`<span class="role-label"><span class="role-emoji">%s</span> %s</span>`, roleEmoji, roleLabel))
 
 	// Show model name for assistant messages
 	if msg.Role == "assistant" && msg.Model != "" {
@@ -162,7 +167,7 @@ func renderThinking(block session.ContentBlock) string {
 		return ""
 	}
 	return fmt.Sprintf(`<div class="thinking-block">
-		<div class="thinking-label">Thinking</div>
+		<div class="thinking-label"><span class="block-emoji">🧠</span> Thinking</div>
 		<div class="thinking-content">%s</div>
 	</div>`, MarkdownToHTML(block.Text))
 }
@@ -203,7 +208,7 @@ func renderToolUse(block session.ContentBlock, opts *RenderOptions) string {
 func renderBashTool(block session.ContentBlock, input *session.ToolInput) string {
 	var buf bytes.Buffer
 	buf.WriteString(`<div class="tool-block bash-tool">`)
-	buf.WriteString(`<div class="tool-header">Bash`)
+	buf.WriteString(`<div class="tool-header"><span class="block-emoji">🔧</span> Bash`)
 	if input.Description != "" {
 		buf.WriteString(fmt.Sprintf(` <span class="tool-description">%s</span>`, html.EscapeString(input.Description)))
 	}
@@ -216,7 +221,7 @@ func renderBashTool(block session.ContentBlock, input *session.ToolInput) string
 func renderWriteTool(block session.ContentBlock, input *session.ToolInput) string {
 	var buf bytes.Buffer
 	buf.WriteString(`<div class="tool-block write-tool">`)
-	buf.WriteString(fmt.Sprintf(`<div class="tool-header">Write: %s</div>`, html.EscapeString(input.FilePath)))
+	buf.WriteString(fmt.Sprintf(`<div class="tool-header"><span class="block-emoji">🔧</span> Write: %s</div>`, html.EscapeString(input.FilePath)))
 
 	content := input.Content
 	truncated := false
@@ -238,7 +243,7 @@ func renderWriteTool(block session.ContentBlock, input *session.ToolInput) strin
 func renderEditTool(block session.ContentBlock, input *session.ToolInput) string {
 	var buf bytes.Buffer
 	buf.WriteString(`<div class="tool-block edit-tool">`)
-	buf.WriteString(fmt.Sprintf(`<div class="tool-header">Edit: %s</div>`, html.EscapeString(input.FilePath)))
+	buf.WriteString(fmt.Sprintf(`<div class="tool-header"><span class="block-emoji">🔧</span> Edit: %s</div>`, html.EscapeString(input.FilePath)))
 
 	buf.WriteString(`<div class="edit-diff">`)
 	if input.OldString != "" {
@@ -261,7 +266,7 @@ func renderEditTool(block session.ContentBlock, input *session.ToolInput) string
 func renderReadTool(block session.ContentBlock, input *session.ToolInput) string {
 	var buf bytes.Buffer
 	buf.WriteString(`<div class="tool-block read-tool">`)
-	buf.WriteString(fmt.Sprintf(`<div class="tool-header">Read: %s</div>`, html.EscapeString(input.FilePath)))
+	buf.WriteString(fmt.Sprintf(`<div class="tool-header"><span class="block-emoji">🔧</span> Read: %s</div>`, html.EscapeString(input.FilePath)))
 	buf.WriteString(`</div>`)
 	return buf.String()
 }
@@ -269,7 +274,7 @@ func renderReadTool(block session.ContentBlock, input *session.ToolInput) string
 func renderSearchTool(block session.ContentBlock, input *session.ToolInput) string {
 	var buf bytes.Buffer
 	buf.WriteString(`<div class="tool-block search-tool">`)
-	buf.WriteString(fmt.Sprintf(`<div class="tool-header">%s</div>`, block.Name))
+	buf.WriteString(fmt.Sprintf(`<div class="tool-header"><span class="block-emoji">🔧</span> %s</div>`, block.Name))
 
 	if input.Pattern != "" {
 		buf.WriteString(fmt.Sprintf(`<div class="search-pattern">Pattern: <code>%s</code></div>`, html.EscapeString(input.Pattern)))
@@ -285,7 +290,7 @@ func renderSearchTool(block session.ContentBlock, input *session.ToolInput) stri
 func renderTodoTool(block session.ContentBlock, input *session.ToolInput) string {
 	var buf bytes.Buffer
 	buf.WriteString(`<div class="tool-block todo-tool">`)
-	buf.WriteString(`<div class="tool-header">TodoWrite</div>`)
+	buf.WriteString(`<div class="tool-header"><span class="block-emoji">🔧</span> TodoWrite</div>`)
 	buf.WriteString(`<ul class="todo-list">`)
 
 	for _, todo := range input.Todos {
@@ -308,7 +313,7 @@ func renderTodoTool(block session.ContentBlock, input *session.ToolInput) string
 func renderGenericToolUse(block session.ContentBlock) string {
 	var buf bytes.Buffer
 	buf.WriteString(`<div class="tool-block">`)
-	buf.WriteString(fmt.Sprintf(`<div class="tool-header">%s</div>`, html.EscapeString(block.Name)))
+	buf.WriteString(fmt.Sprintf(`<div class="tool-header"><span class="block-emoji">🔧</span> %s</div>`, html.EscapeString(block.Name)))
 
 	if len(block.Input) > 0 {
 		var prettyJSON bytes.Buffer
@@ -402,7 +407,25 @@ func formatTimestamp(t time.Time) string {
 	if t.IsZero() {
 		return ""
 	}
-	return t.Local().Format("Jan 2, 2006 3:04 PM")
+	return t.Local().Format("Jan 2, 2006 3:04 PM MST")
+}
+
+// formatDuration formats a duration as human-readable string (e.g., "2h 15m" or "45m")
+func formatDuration(d time.Duration) string {
+	if d <= 0 {
+		return "0m"
+	}
+
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+
+	if hours > 0 {
+		if minutes > 0 {
+			return fmt.Sprintf("%dh %dm", hours, minutes)
+		}
+		return fmt.Sprintf("%dh", hours)
+	}
+	return fmt.Sprintf("%dm", minutes)
 }
 
 // capitalizeFirst capitalizes the first letter of a string
