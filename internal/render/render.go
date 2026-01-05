@@ -23,8 +23,13 @@ type RenderOptions struct {
 	RepoURL string
 }
 
-// RenderMessage renders a single message to HTML
+// RenderMessage renders a single message to HTML (deprecated, use RenderMessageWithAnchor)
 func RenderMessage(msg session.MessageEntry, msgIndex int, opts *RenderOptions) string {
+	return RenderMessageWithAnchor(msg, fmt.Sprintf("msg-%d", msgIndex), opts)
+}
+
+// RenderMessageWithAnchor renders a single message to HTML with an optional anchor ID
+func RenderMessageWithAnchor(msg session.MessageEntry, anchorID string, opts *RenderOptions) string {
 	var buf bytes.Buffer
 
 	roleClass := msg.Role
@@ -35,8 +40,11 @@ func RenderMessage(msg session.MessageEntry, msgIndex int, opts *RenderOptions) 
 		timestamp = msg.Timestamp.Format(time.RFC3339)
 	}
 
-	msgID := fmt.Sprintf("msg-%d", msgIndex)
-	buf.WriteString(fmt.Sprintf(`<div class="message %s" id="%s">`, roleClass, msgID))
+	if anchorID != "" {
+		buf.WriteString(fmt.Sprintf(`<div class="message %s" id="%s">`, roleClass, anchorID))
+	} else {
+		buf.WriteString(fmt.Sprintf(`<div class="message %s">`, roleClass))
+	}
 	buf.WriteString(fmt.Sprintf(`<div class="message-header">%s`, roleLabel))
 	if timestamp != "" {
 		buf.WriteString(fmt.Sprintf(` <span class="timestamp">%s</span>`, formatTimestamp(msg.Timestamp)))

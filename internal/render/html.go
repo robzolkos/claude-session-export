@@ -69,12 +69,7 @@ func (g *Generator) Generate() error {
 			end = len(conversations)
 		}
 
-		var messages []session.MessageEntry
-		for _, conv := range conversations[start:end] {
-			messages = append(messages, conv.Messages...)
-		}
-
-		if err := g.generatePage(pageNum, totalPages, messages); err != nil {
+		if err := g.generatePage(pageNum, totalPages, conversations[start:end], start); err != nil {
 			return fmt.Errorf("generating page %d: %w", pageNum, err)
 		}
 	}
@@ -137,15 +132,23 @@ func (g *Generator) buildIndexData(conversations []session.Conversation, totalPa
 	return data
 }
 
-func (g *Generator) generatePage(pageNum, totalPages int, messages []session.MessageEntry) error {
+func (g *Generator) generatePage(pageNum, totalPages int, conversations []session.Conversation, startConvIdx int) error {
 	var buf bytes.Buffer
 
 	opts := &RenderOptions{RepoURL: g.RepoURL}
 
-	// Render messages
+	// Render messages with conversation anchors
 	var messagesHTML bytes.Buffer
-	for i, msg := range messages {
-		messagesHTML.WriteString(RenderMessage(msg, i, opts))
+	for convOffset, conv := range conversations {
+		convIdx := startConvIdx + convOffset
+		for msgIdx, msg := range conv.Messages {
+			// First message of each conversation gets the anchor ID
+			anchorID := ""
+			if msgIdx == 0 {
+				anchorID = fmt.Sprintf("msg-%d", convIdx)
+			}
+			messagesHTML.WriteString(RenderMessageWithAnchor(msg, anchorID, opts))
+		}
 	}
 
 	// Build page
@@ -325,8 +328,39 @@ func (g *Generator) wrapHTML(title, content string) string {
 	<div class="container">
 		%s
 	</div>
+	<script>%s</script>
 </body>
-</html>`, html.EscapeString(title), getCSS(), content)
+</html>`, html.EscapeString(title), getCSS(), content, getGistPreviewJS())
+}
+
+func getGistPreviewJS() string {
+	return `
+// Fix navigation for gistpreview.github.io
+(function() {
+	if (!window.location.hostname.includes('gistpreview.github.io')) return;
+
+	// Extract gist ID from URL (format: ?gist_id/filename or ?gist_id)
+	var search = window.location.search.slice(1); // Remove leading ?
+	var parts = search.split('/');
+	var gistId = parts[0];
+	if (!gistId) return;
+
+	// Rewrite all relative links to use gistpreview format
+	document.querySelectorAll('a[href]').forEach(function(a) {
+		var href = a.getAttribute('href');
+		// Skip external links and anchors
+		if (href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:')) return;
+
+		// Handle links like "page-001.html" or "page-001.html#msg-5" or "index.html"
+		var hashIdx = href.indexOf('#');
+		var filename = hashIdx >= 0 ? href.slice(0, hashIdx) : href;
+		var hash = hashIdx >= 0 ? href.slice(hashIdx) : '';
+
+		// Rewrite to gistpreview format
+		a.href = '?' + gistId + '/' + filename + hash;
+	});
+})();
+`
 }
 
 func (g *Generator) copySourceFile() error {
