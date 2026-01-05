@@ -20,6 +20,34 @@ import (
 
 var version = "dev"
 
+// reorderArgs moves flags before positional arguments so Go's flag package can parse them.
+// Go's flag.Parse stops at the first non-flag argument, so "json file.jsonl --gist" fails.
+// This reorders to "json --gist file.jsonl".
+// It correctly handles flags with values like "-o dir" or "--output=dir".
+func reorderArgs(args []string) []string {
+	// Flags that take a value (without =)
+	valueFlags := map[string]bool{
+		"-o": true, "--output": true,
+		"--limit": true, "--max-matches": true,
+	}
+
+	var flags, positional []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-") {
+			flags = append(flags, arg)
+			// Check if this flag takes a separate value argument
+			if !strings.Contains(arg, "=") && valueFlags[arg] && i+1 < len(args) {
+				i++
+				flags = append(flags, args[i])
+			}
+		} else {
+			positional = append(positional, arg)
+		}
+	}
+	return append(flags, positional...)
+}
+
 // Run executes the CLI with the given arguments
 func Run(args []string) error {
 	if len(args) == 0 {
@@ -91,7 +119,7 @@ func runLocal(args []string) error {
 	quiet := fs.Bool("quiet", false, "Suppress output")
 	limit := fs.Int("limit", 20, "Maximum number of sessions to show")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
@@ -127,7 +155,7 @@ func runJSON(args []string) error {
 	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
 	quiet := fs.Bool("quiet", false, "Suppress output")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
@@ -155,7 +183,7 @@ func runWeb(args []string) error {
 	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
 	quiet := fs.Bool("quiet", false, "Suppress output")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
@@ -197,7 +225,7 @@ func runAll(args []string) error {
 	openBrowser := fs.Bool("open", false, "Open in browser when done")
 	quiet := fs.Bool("quiet", false, "Suppress output")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
@@ -262,7 +290,7 @@ func runSearch(args []string) error {
 	quiet := fs.Bool("quiet", false, "Suppress output")
 	maxMatches := fs.Int("max-matches", 3, "Maximum matches to show per session")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
