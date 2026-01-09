@@ -12,12 +12,16 @@ import (
 
 // SessionInfo contains metadata about a discovered session
 type SessionInfo struct {
-	Path        string
-	ProjectName string
-	SessionID   string
-	ModTime     time.Time
-	Size        int64
-	Summary     string
+	Path         string
+	ProjectName  string
+	SessionID    string
+	ModTime      time.Time
+	Size         int64
+	Summary      string
+	StartTime    time.Time
+	EndTime      time.Time
+	MessageCount int
+	UserMsgCount int
 }
 
 // ProjectInfo contains metadata about a project folder
@@ -185,28 +189,112 @@ func FindAllSessions() ([]ProjectInfo, error) {
 	return projects, nil
 }
 
-// GetSessionSummary loads a session and returns the first user message as summary
-func GetSessionSummary(path string) (string, error) {
+// SessionDetails contains parsed session details
+type SessionDetails struct {
+	Summary      string
+	StartTime    time.Time
+	EndTime      time.Time
+	MessageCount int
+	UserMsgCount int
+}
+
+// GetSessionDetails loads a session and returns details for display
+func GetSessionDetails(path string) (*SessionDetails, error) {
 	session, err := ParseFile(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	summary := GetFirstUserMessage(session)
-	if len(summary) > 100 {
-		summary = summary[:100] + "..."
+	details := &SessionDetails{
+		MessageCount: len(session.Messages),
 	}
-	return summary, nil
+
+	// Find first meaningful user message and count user messages
+	for _, msg := range session.Messages {
+		// Track start time from first message with timestamp
+		if details.StartTime.IsZero() && !msg.Timestamp.IsZero() {
+			details.StartTime = msg.Timestamp
+		}
+		// Track end time from last message with timestamp
+		if !msg.Timestamp.IsZero() {
+			details.EndTime = msg.Timestamp
+		}
+
+		if msg.Role == "user" {
+			details.UserMsgCount++
+
+			// Only set summary if not already set
+			if details.Summary == "" {
+				text := ExtractText(&msg)
+				// Skip warmup and caveat/compaction messages
+				if text != "" && !isBoringMessage(text) {
+					// Clean up whitespace - replace newlines/tabs with spaces
+					text = strings.ReplaceAll(text, "\n", " ")
+					text = strings.ReplaceAll(text, "\t", " ")
+					text = strings.TrimSpace(text)
+					// Collapse multiple spaces
+					for strings.Contains(text, "  ") {
+						text = strings.ReplaceAll(text, "  ", " ")
+					}
+					if len(text) > 80 {
+						text = text[:80] + "..."
+					}
+					details.Summary = text
+				}
+			}
+		}
+	}
+
+	return details, nil
+}
+
+// isBoringMessage returns true for messages that aren't useful as summaries
+func isBoringMessage(text string) bool {
+	lower := strings.ToLower(text)
+	// Skip "Warmup" messages
+	if lower == "warmup" {
+		return true
+	}
+	// Skip caveat/compaction messages
+	if strings.HasPrefix(text, "<local-command-caveat>") {
+		return true
+	}
+	if strings.HasPrefix(text, "This session is being continued") {
+		return true
+	}
+	// Skip command messages like /clear, /exit
+	if strings.HasPrefix(text, "<command-name>") {
+		return true
+	}
+	return false
 }
 
 // LoadSessionSummaries loads summaries for a list of sessions
 func LoadSessionSummaries(sessions []SessionInfo) {
 	for i := range sessions {
-		summary, err := GetSessionSummary(sessions[i].Path)
+		details, err := GetSessionDetails(sessions[i].Path)
 		if err == nil {
-			sessions[i].Summary = summary
+			sessions[i].Summary = details.Summary
+			sessions[i].StartTime = details.StartTime
+			sessions[i].EndTime = details.EndTime
+			sessions[i].MessageCount = details.MessageCount
+			sessions[i].UserMsgCount = details.UserMsgCount
 		}
 	}
+
+	// Re-sort by EndTime (most recently updated first)
+	sort.Slice(sessions, func(i, j int) bool {
+		// Use EndTime if available, fall back to ModTime
+		ti := sessions[i].EndTime
+		if ti.IsZero() {
+			ti = sessions[i].ModTime
+		}
+		tj := sessions[j].EndTime
+		if tj.IsZero() {
+			tj = sessions[j].ModTime
+		}
+		return ti.After(tj)
+	})
 }
 
 // SearchMatch represents a single match within a session
