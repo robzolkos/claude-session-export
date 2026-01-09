@@ -152,20 +152,3 @@ func UploadViaAPI(dir string, public bool) (string, error) {
 
 	return resp.HTMLURL, nil
 }
-
-// GetPreviewURL returns the gistpreview.github.io URL for a gist
-func GetPreviewURL(gistURL string) string {
-	id := extractID(gistURL)
-	if id == "" {
-		return ""
-	}
-	return fmt.Sprintf("https://gistpreview.github.io/?%s/index.html", id)
-}
-
-func extractID(gistURL string) string {
-	parts := strings.Split(gistURL, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-	return ""
-}

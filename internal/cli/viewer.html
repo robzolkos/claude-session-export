@@ -1,0 +1,2180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Session Viewer</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg-deep: #0a0a0b;
+			--bg-primary: #111113;
+			--bg-elevated: #18181b;
+			--bg-hover: #1f1f23;
+			--bg-active: #27272a;
+
+			--border-subtle: #27272a;
+			--border-default: #3f3f46;
+			--border-emphasis: #52525b;
+
+			--text-primary: #fafafa;
+			--text-secondary: #a1a1aa;
+			--text-tertiary: #71717a;
+			--text-muted: #52525b;
+
+			--accent-blue: #3b82f6;
+			--accent-blue-soft: rgba(59, 130, 246, 0.15);
+			--accent-violet: #8b5cf6;
+			--accent-violet-soft: rgba(139, 92, 246, 0.12);
+			--accent-emerald: #10b981;
+			--accent-emerald-soft: rgba(16, 185, 129, 0.12);
+			--accent-amber: #f59e0b;
+			--accent-amber-soft: rgba(245, 158, 11, 0.12);
+			--accent-rose: #f43f5e;
+			--accent-rose-soft: rgba(244, 63, 94, 0.12);
+
+			--font-sans: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+			--font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+			--radius-sm: 6px;
+			--radius-md: 10px;
+			--radius-lg: 14px;
+			--radius-xl: 20px;
+
+			--shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+			--shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+			--shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		html {
+			font-size: 15px;
+		}
+
+		body {
+			font-family: var(--font-sans);
+			background: var(--bg-deep);
+			color: var(--text-primary);
+			line-height: 1.6;
+			min-height: 100vh;
+		}
+
+		/* Header */
+		.header {
+			position: sticky;
+			top: 0;
+			z-index: 100;
+			background: var(--bg-primary);
+			border-bottom: 1px solid var(--border-subtle);
+			backdrop-filter: blur(12px);
+			background: rgba(17, 17, 19, 0.85);
+		}
+
+		.header-inner {
+			max-width: 1200px;
+			margin: 0 auto;
+			padding: 16px 24px;
+		}
+
+		.brand {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			margin-bottom: 16px;
+		}
+
+		.brand-icon {
+			width: 32px;
+			height: 32px;
+			background: linear-gradient(135deg, var(--accent-violet) 0%, var(--accent-blue) 100%);
+			border-radius: var(--radius-sm);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 16px;
+		}
+
+		.brand-text {
+			font-weight: 600;
+			font-size: 1.1rem;
+			letter-spacing: -0.02em;
+		}
+
+		.url-form {
+			display: flex;
+			gap: 10px;
+		}
+
+		.url-input {
+			flex: 1;
+			padding: 12px 16px;
+			font-size: 0.9rem;
+			font-family: var(--font-mono);
+			background: var(--bg-deep);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-md);
+			color: var(--text-primary);
+			transition: all 0.2s ease;
+		}
+
+		.url-input:focus {
+			outline: none;
+			border-color: var(--accent-violet);
+			box-shadow: 0 0 0 3px var(--accent-violet-soft);
+		}
+
+		.url-input::placeholder {
+			color: var(--text-muted);
+		}
+
+		.copy-btn {
+			padding: 12px;
+			width: 46px;
+			height: 46px;
+			font-size: 1rem;
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-md);
+			color: var(--text-secondary);
+			cursor: pointer;
+			transition: all 0.2s ease;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.copy-btn:hover {
+			background: var(--bg-hover);
+			border-color: var(--border-default);
+		}
+
+		.copy-btn.copied {
+			background: var(--accent-emerald-soft);
+			border-color: var(--accent-emerald);
+		}
+
+		.load-btn {
+			padding: 12px 24px;
+			font-size: 0.9rem;
+			font-weight: 600;
+			font-family: var(--font-sans);
+			background: linear-gradient(135deg, var(--accent-violet) 0%, var(--accent-blue) 100%);
+			border: none;
+			border-radius: var(--radius-md);
+			color: white;
+			cursor: pointer;
+			transition: all 0.2s ease;
+			white-space: nowrap;
+		}
+
+		.load-btn:hover {
+			transform: translateY(-1px);
+			box-shadow: var(--shadow-md), 0 0 20px var(--accent-violet-soft);
+		}
+
+		.load-btn:active {
+			transform: translateY(0);
+		}
+
+		.status {
+			margin-top: 12px;
+			font-size: 0.85rem;
+			color: var(--text-tertiary);
+			font-family: var(--font-mono);
+		}
+
+		.status.error {
+			color: var(--accent-rose);
+		}
+
+		/* View Controls */
+		.view-controls {
+			display: none;
+			margin-top: 12px;
+			gap: 8px;
+		}
+
+		.view-controls.visible {
+			display: flex;
+		}
+
+		.view-btn {
+			padding: 8px 16px;
+			font-size: 0.8rem;
+			font-weight: 600;
+			font-family: var(--font-sans);
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-sm);
+			color: var(--text-secondary);
+			cursor: pointer;
+			transition: all 0.2s ease;
+		}
+
+		.view-btn:hover {
+			background: var(--bg-hover);
+			border-color: var(--border-default);
+		}
+
+		.view-btn.active {
+			background: var(--accent-violet-soft);
+			border-color: var(--accent-violet);
+			color: var(--accent-violet);
+		}
+
+		/* Session Stats */
+		.session-stats {
+			background: var(--bg-primary);
+			border-bottom: 1px solid var(--border-subtle);
+			padding: 20px 0;
+			display: none;
+		}
+
+		.session-stats.visible {
+			display: block;
+			animation: slideDown 0.3s ease;
+		}
+
+		@keyframes slideDown {
+			from {
+				opacity: 0;
+				transform: translateY(-10px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		.stats-inner {
+			max-width: 1200px;
+			margin: 0 auto;
+			padding: 0 24px;
+		}
+
+		.stats-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+			gap: 16px;
+		}
+
+		.stat-card {
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-md);
+			padding: 16px;
+			transition: all 0.2s ease;
+		}
+
+		.stat-card:hover {
+			border-color: var(--border-default);
+			background: var(--bg-hover);
+		}
+
+		.stat-label {
+			font-size: 0.75rem;
+			font-weight: 500;
+			color: var(--text-tertiary);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			margin-bottom: 6px;
+		}
+
+		.stat-value {
+			font-size: 1.4rem;
+			font-weight: 700;
+			letter-spacing: -0.02em;
+			display: flex;
+			align-items: baseline;
+			gap: 6px;
+		}
+
+		.stat-value .unit {
+			font-size: 0.85rem;
+			font-weight: 500;
+			color: var(--text-tertiary);
+		}
+
+		.stat-row {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 6px 0;
+		}
+
+		.stat-row:not(:last-child) {
+			border-bottom: 1px solid var(--border-subtle);
+		}
+
+		.stat-row.total {
+			margin-top: 4px;
+			padding-top: 10px;
+			border-top: 1px solid var(--border-default);
+			border-bottom: none;
+		}
+
+		.stat-row-label {
+			font-size: 0.8rem;
+			color: var(--text-tertiary);
+		}
+
+		.stat-row-value {
+			font-size: 0.95rem;
+			font-weight: 600;
+			font-family: var(--font-mono);
+			color: var(--text-primary);
+		}
+
+		.stat-row-value.muted { color: var(--text-tertiary); }
+		.stat-row-value.accent { color: var(--accent-violet); }
+		.stat-row-value.blue { color: var(--accent-blue); }
+		.stat-row-value.green { color: var(--accent-emerald); }
+		.stat-row-value.amber { color: var(--accent-amber); }
+
+		.models-list {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 6px;
+			margin-top: 4px;
+		}
+
+		.model-badge {
+			font-size: 0.7rem;
+			font-weight: 600;
+			padding: 4px 8px;
+			background: var(--accent-violet-soft);
+			color: var(--accent-violet);
+			border-radius: 4px;
+			font-family: var(--font-mono);
+		}
+
+		/* Messages Container */
+		.messages-container {
+			max-width: 900px;
+			margin: 0 auto;
+			padding: 32px 24px;
+		}
+
+		/* Conversation Groups */
+		.conversation-group {
+			margin-bottom: 8px;
+			scroll-margin-top: 140px;
+		}
+
+		.conversation-group .message.user {
+			cursor: pointer;
+		}
+
+		.conversation-group .message.user .message-bubble {
+			transition: all 0.2s ease;
+		}
+
+		.conversation-group .message.user:hover .message-bubble {
+			box-shadow: var(--shadow-lg), 0 0 40px var(--accent-blue-soft);
+		}
+
+		.conversation-group .response-messages {
+			display: none;
+			padding-left: 0;
+			margin-top: 16px;
+		}
+
+		.conversation-group.expanded .response-messages {
+			display: block;
+		}
+
+		/* Expand indicator on user messages */
+		.message.user .expand-indicator {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			font-size: 0.7rem;
+			color: rgba(255,255,255,0.6);
+			margin-left: 8px;
+			transition: transform 0.2s ease;
+		}
+
+		.conversation-group.expanded .message.user .expand-indicator {
+			transform: rotate(180deg);
+		}
+
+		/* When in expanded view, show all responses */
+		.messages-container.expanded-view .conversation-group .response-messages {
+			display: block;
+		}
+
+		.messages-container.expanded-view .message.user .expand-indicator {
+			display: none;
+		}
+
+		.messages-container.expanded-view .conversation-group {
+			margin-bottom: 24px;
+		}
+
+		/* Message Styles */
+		.message {
+			margin-bottom: 24px;
+			animation: fadeIn 0.3s ease;
+		}
+
+		@keyframes fadeIn {
+			from {
+				opacity: 0;
+				transform: translateY(8px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		/* User Messages - Chat Bubble Style */
+		.message.user {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+		}
+
+		.message.user .message-bubble {
+			min-width: 280px;
+			max-width: 85%;
+			background: linear-gradient(135deg, var(--accent-blue) 0%, #2563eb 100%);
+			border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+			padding: 16px 20px;
+			color: white;
+			box-shadow: var(--shadow-md), 0 0 30px var(--accent-blue-soft);
+		}
+
+		.message.user .message-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 8px;
+			opacity: 0.9;
+		}
+
+		.message.user .message-role {
+			font-size: 0.75rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		.message.user .message-time {
+			font-size: 0.7rem;
+			opacity: 0.7;
+			font-family: var(--font-mono);
+		}
+
+		.message.user .message-content {
+			font-size: 0.95rem;
+			line-height: 1.6;
+		}
+
+		/* Assistant Messages */
+		.message.assistant {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.message.assistant .message-bubble {
+			width: 100%;
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+			padding: 20px;
+		}
+
+		.message.assistant .message-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 12px;
+			padding-bottom: 12px;
+			border-bottom: 1px solid var(--border-subtle);
+		}
+
+		.message.assistant .header-left {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+
+		.message.assistant .avatar {
+			width: 28px;
+			height: 28px;
+			background: linear-gradient(135deg, var(--accent-violet) 0%, var(--accent-blue) 100%);
+			border-radius: var(--radius-sm);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 14px;
+		}
+
+		.message.assistant .message-role {
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-primary);
+		}
+
+		.message.assistant .model-tag {
+			font-size: 0.7rem;
+			font-weight: 500;
+			padding: 3px 8px;
+			background: var(--bg-active);
+			color: var(--text-secondary);
+			border-radius: 4px;
+			font-family: var(--font-mono);
+		}
+
+		.message.assistant .header-right {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+		}
+
+		.message.assistant .message-time {
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			font-family: var(--font-mono);
+		}
+
+		.message.assistant .message-content {
+			color: var(--text-secondary);
+			font-size: 0.95rem;
+			line-height: 1.7;
+		}
+
+		.message.assistant .message-content p {
+			margin-bottom: 12px;
+		}
+
+		.message.assistant .message-content p:last-child {
+			margin-bottom: 0;
+		}
+
+		/* Token Usage */
+		.token-usage {
+			display: flex;
+			gap: 12px;
+			margin-top: 16px;
+			padding-top: 12px;
+			border-top: 1px solid var(--border-subtle);
+		}
+
+		.token-stat {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 0.75rem;
+			font-family: var(--font-mono);
+		}
+
+		.token-stat .icon {
+			font-size: 0.9rem;
+		}
+
+		.token-stat.input { color: var(--accent-blue); }
+		.token-stat.output { color: var(--accent-emerald); }
+		.token-stat.cache { color: var(--accent-amber); }
+
+		/* Tool Blocks */
+		.tool-block {
+			margin: 12px 0;
+			background: var(--bg-deep);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-md);
+			overflow: hidden;
+		}
+
+		.tool-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 10px 14px;
+			background: var(--bg-primary);
+			border-bottom: 1px solid var(--border-subtle);
+			cursor: pointer;
+			transition: background 0.2s ease;
+		}
+
+		.tool-header:hover {
+			background: var(--bg-hover);
+		}
+
+		.tool-header-left {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+
+		.tool-icon {
+			width: 24px;
+			height: 24px;
+			border-radius: 4px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 12px;
+		}
+
+		.tool-icon.bash { background: var(--accent-emerald-soft); color: var(--accent-emerald); }
+		.tool-icon.read { background: var(--accent-blue-soft); color: var(--accent-blue); }
+		.tool-icon.write { background: var(--accent-violet-soft); color: var(--accent-violet); }
+		.tool-icon.edit { background: var(--accent-amber-soft); color: var(--accent-amber); }
+		.tool-icon.search { background: var(--accent-rose-soft); color: var(--accent-rose); }
+		.tool-icon.default { background: var(--bg-active); color: var(--text-secondary); }
+
+		.tool-name {
+			font-size: 0.8rem;
+			font-weight: 600;
+			color: var(--text-primary);
+		}
+
+		.tool-desc {
+			font-size: 0.75rem;
+			color: var(--text-tertiary);
+			font-family: var(--font-mono);
+			max-width: 400px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.tool-toggle {
+			font-size: 0.8rem;
+			color: var(--text-muted);
+			transition: transform 0.2s ease;
+		}
+
+		.tool-block.expanded .tool-toggle {
+			transform: rotate(180deg);
+		}
+
+		.tool-content {
+			display: none;
+			padding: 14px;
+		}
+
+		.tool-block.expanded .tool-content {
+			display: block;
+		}
+
+		.tool-content pre {
+			margin: 0;
+			padding: 12px;
+			background: var(--bg-primary);
+			border-radius: var(--radius-sm);
+			overflow-x: auto;
+			font-family: var(--font-mono);
+			font-size: 0.8rem;
+			line-height: 1.5;
+			color: var(--text-secondary);
+		}
+
+		.tool-content code {
+			font-family: inherit;
+		}
+
+		/* Tool Result (inline) */
+		.tool-result {
+			margin: 8px 0;
+			padding: 12px;
+			background: var(--bg-deep);
+			border-left: 3px solid var(--border-default);
+			border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+			font-size: 0.85rem;
+		}
+
+		.tool-result.error {
+			border-left-color: var(--accent-rose);
+			background: var(--accent-rose-soft);
+		}
+
+		.tool-result pre {
+			margin: 0;
+			font-family: var(--font-mono);
+			font-size: 0.8rem;
+			white-space: pre-wrap;
+			word-break: break-word;
+			color: var(--text-tertiary);
+		}
+
+		/* Tool Results Message (standalone) */
+		.message.tool_results {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.message.tool_results .message-bubble {
+			width: 100%;
+			background: var(--bg-primary);
+			border: 1px solid var(--border-subtle);
+			border-left: 3px solid var(--accent-amber);
+			border-radius: var(--radius-sm);
+			padding: 14px 16px;
+		}
+
+		.message.tool_results .message-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 10px;
+			padding-bottom: 10px;
+			border-bottom: 1px solid var(--border-subtle);
+		}
+
+		.message.tool_results .header-left {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.message.tool_results .tool-results-icon {
+			font-size: 1rem;
+		}
+
+		.message.tool_results .message-role {
+			font-size: 0.8rem;
+			font-weight: 600;
+			color: var(--accent-amber);
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+		}
+
+		.message.tool_results .message-time {
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			font-family: var(--font-mono);
+		}
+
+		.tool-result-item {
+			margin: 6px 0;
+			padding: 10px;
+			background: var(--bg-deep);
+			border-radius: var(--radius-sm);
+		}
+
+		.tool-result-item.error {
+			background: var(--accent-rose-soft);
+			border-left: 2px solid var(--accent-rose);
+		}
+
+		.tool-result-item pre {
+			margin: 0;
+			font-family: var(--font-mono);
+			font-size: 0.8rem;
+			white-space: pre-wrap;
+			word-break: break-word;
+			color: var(--text-tertiary);
+			line-height: 1.5;
+		}
+
+		/* System Output Message */
+		.message.system_output {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.message.system_output .message-bubble {
+			max-width: 400px;
+			background: var(--bg-elevated);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-md);
+			padding: 12px 16px;
+			text-align: center;
+		}
+
+		.message.system_output .message-header {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			margin-bottom: 8px;
+		}
+
+		.message.system_output .header-left {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.message.system_output .header-right {
+			display: none;
+		}
+
+		.message.system_output .system-output-icon {
+			font-size: 0.9rem;
+		}
+
+		.message.system_output .message-role {
+			font-size: 0.7rem;
+			font-weight: 600;
+			color: var(--text-muted);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		.message.system_output .message-content {
+			color: var(--text-secondary);
+			font-size: 0.9rem;
+			font-style: italic;
+		}
+
+		/* Compaction Message */
+		.message.compaction {
+			display: flex;
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.compaction-details {
+			width: 100%;
+			background: var(--bg-primary);
+			border: 1px dashed var(--border-default);
+			border-radius: var(--radius-md);
+			overflow: hidden;
+		}
+
+		.compaction-summary {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			padding: 12px 16px;
+			cursor: pointer;
+			user-select: none;
+			transition: background 0.2s ease;
+		}
+
+		.compaction-summary:hover {
+			background: var(--bg-hover);
+		}
+
+		.compaction-summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.compaction-summary::after {
+			content: '▶';
+			margin-left: auto;
+			font-size: 0.7rem;
+			color: var(--text-muted);
+			transition: transform 0.2s ease;
+		}
+
+		.compaction-details[open] .compaction-summary::after {
+			transform: rotate(90deg);
+		}
+
+		.compaction-icon {
+			font-size: 1.1rem;
+		}
+
+		.compaction-label {
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--text-secondary);
+		}
+
+		.compaction-time {
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			font-family: var(--font-mono);
+		}
+
+		.compaction-content {
+			padding: 16px;
+			border-top: 1px dashed var(--border-subtle);
+			background: var(--bg-deep);
+			max-height: 400px;
+			overflow-y: auto;
+		}
+
+		.compaction-content pre {
+			margin: 0;
+			font-family: var(--font-mono);
+			font-size: 0.75rem;
+			white-space: pre-wrap;
+			word-break: break-word;
+			color: var(--text-tertiary);
+			line-height: 1.6;
+		}
+
+		/* Thinking Block */
+		.thinking-block {
+			margin: 12px 0;
+			padding: 14px;
+			background: linear-gradient(135deg, var(--accent-violet-soft) 0%, transparent 100%);
+			border: 1px solid var(--accent-violet);
+			border-radius: var(--radius-md);
+			border-left-width: 3px;
+		}
+
+		.thinking-label {
+			font-size: 0.75rem;
+			font-weight: 600;
+			color: var(--accent-violet);
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			margin-bottom: 8px;
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.thinking-content {
+			font-size: 0.9rem;
+			color: var(--text-secondary);
+			font-style: italic;
+		}
+
+		/* Empty State */
+		.empty-state {
+			text-align: center;
+			padding: 80px 24px;
+			color: var(--text-tertiary);
+		}
+
+		.empty-icon {
+			font-size: 48px;
+			margin-bottom: 16px;
+			opacity: 0.5;
+		}
+
+		.empty-text {
+			font-size: 1rem;
+			margin-bottom: 8px;
+		}
+
+		.empty-hint {
+			font-size: 0.85rem;
+			color: var(--text-muted);
+		}
+
+		/* Slash Commands */
+		.slash-command {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			padding: 6px 12px;
+			background: var(--bg-active);
+			border: 1px solid var(--border-default);
+			border-radius: var(--radius-md);
+			font-family: var(--font-mono);
+			font-size: 0.9rem;
+		}
+
+		.command-slash {
+			color: var(--accent-violet);
+			font-weight: 600;
+		}
+
+		.command-args {
+			color: var(--text-secondary);
+		}
+
+		.local-stdout {
+			font-family: var(--font-mono);
+			font-size: 0.85rem;
+			color: var(--text-tertiary);
+			font-style: italic;
+		}
+
+		/* Code in text */
+		.message-content code {
+			font-family: var(--font-mono);
+			font-size: 0.85em;
+			padding: 2px 6px;
+			background: var(--bg-active);
+			border-radius: 4px;
+			color: var(--accent-violet);
+		}
+
+		/* Markdown code blocks */
+		.message-content pre {
+			margin: 12px 0;
+			padding: 14px;
+			background: var(--bg-deep);
+			border: 1px solid var(--border-subtle);
+			border-radius: var(--radius-md);
+			overflow-x: auto;
+		}
+
+		.message-content pre code {
+			padding: 0;
+			background: none;
+			color: var(--text-secondary);
+			font-size: 0.85rem;
+			line-height: 1.5;
+		}
+
+		/* Markdown headings */
+		.message-content h1,
+		.message-content h2,
+		.message-content h3,
+		.message-content h4 {
+			margin: 16px 0 8px;
+			font-weight: 600;
+			color: var(--text-primary);
+		}
+
+		.message-content h1 { font-size: 1.4rem; }
+		.message-content h2 { font-size: 1.2rem; }
+		.message-content h3 { font-size: 1.1rem; }
+		.message-content h4 { font-size: 1rem; }
+
+		/* Markdown lists */
+		.message-content ul,
+		.message-content ol {
+			margin: 8px 0;
+			padding-left: 24px;
+		}
+
+		.message-content li {
+			margin: 4px 0;
+		}
+
+		/* Markdown blockquote */
+		.message-content blockquote {
+			margin: 12px 0;
+			padding: 8px 16px;
+			border-left: 3px solid var(--accent-violet);
+			background: var(--accent-violet-soft);
+			border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+			color: var(--text-secondary);
+		}
+
+		/* Markdown links */
+		.message-content a {
+			color: var(--accent-blue);
+			text-decoration: none;
+		}
+
+		.message-content a:hover {
+			text-decoration: underline;
+		}
+
+		/* Markdown bold/italic */
+		.message-content strong {
+			font-weight: 600;
+			color: var(--text-primary);
+		}
+
+		.message-content em {
+			font-style: italic;
+		}
+
+		/* Markdown hr */
+		.message-content hr {
+			margin: 16px 0;
+			border: none;
+			border-top: 1px solid var(--border-subtle);
+		}
+
+		/* Markdown tables */
+		.message-content table {
+			margin: 12px 0;
+			border-collapse: collapse;
+			width: 100%;
+			font-size: 0.9rem;
+		}
+
+		.message-content th,
+		.message-content td {
+			padding: 8px 12px;
+			border: 1px solid var(--border-subtle);
+			text-align: left;
+		}
+
+		.message-content th {
+			background: var(--bg-active);
+			font-weight: 600;
+		}
+
+		/* Scrollbar */
+		::-webkit-scrollbar {
+			width: 8px;
+			height: 8px;
+		}
+
+		::-webkit-scrollbar-track {
+			background: var(--bg-deep);
+		}
+
+		::-webkit-scrollbar-thumb {
+			background: var(--border-default);
+			border-radius: 4px;
+		}
+
+		::-webkit-scrollbar-thumb:hover {
+			background: var(--border-emphasis);
+		}
+
+		/* Responsive */
+		@media (max-width: 640px) {
+			html {
+				font-size: 14px;
+			}
+
+			.url-form {
+				flex-direction: column;
+			}
+
+			.stats-grid {
+				grid-template-columns: repeat(2, 1fr);
+			}
+
+			.message.user .message-bubble {
+				max-width: 95%;
+			}
+		}
+	</style>
+</head>
+<body>
+	<header class="header">
+		<div class="header-inner">
+			<div class="brand">
+				<div class="brand-icon">◈</div>
+				<span class="brand-text">Session Viewer</span>
+			</div>
+			<div class="url-form">
+				<input type="text" class="url-input" id="gist-url" placeholder="Paste gist URL or raw URL...">
+				<button class="copy-btn" onclick="copyUrl()" title="Copy URL">📋</button>
+				<button class="load-btn" onclick="loadSession()">Load Session</button>
+			</div>
+			<div class="status" id="status"></div>
+			<div class="view-controls" id="view-controls">
+				<button class="view-btn active" data-view="collapsed" onclick="setView('collapsed')">Collapsed</button>
+				<button class="view-btn" data-view="expanded" onclick="setView('expanded')">Expanded</button>
+			</div>
+		</div>
+	</header>
+
+	<section class="session-stats" id="session-stats">
+		<div class="stats-inner">
+			<div class="stats-grid">
+				<div class="stat-card time-card">
+					<div class="stat-label">Time</div>
+					<div class="stat-row">
+						<span class="stat-row-label">Duration</span>
+						<span class="stat-row-value muted" id="stat-duration">—</span>
+					</div>
+					<div class="stat-row">
+						<span class="stat-row-label">Active</span>
+						<span class="stat-row-value accent" id="stat-active-time">—</span>
+					</div>
+				</div>
+				<div class="stat-card tokens-card">
+					<div class="stat-label">Tokens</div>
+					<div class="stat-row">
+						<span class="stat-row-label">Input</span>
+						<span class="stat-row-value blue" id="stat-input">—</span>
+					</div>
+					<div class="stat-row">
+						<span class="stat-row-label">Output</span>
+						<span class="stat-row-value green" id="stat-output">—</span>
+					</div>
+					<div class="stat-row">
+						<span class="stat-row-label">Cache</span>
+						<span class="stat-row-value amber" id="stat-cache">—</span>
+					</div>
+				</div>
+				<div class="stat-card messages-card">
+					<div class="stat-label">Messages</div>
+					<div class="stat-row">
+						<span class="stat-row-label">User</span>
+						<span class="stat-row-value" id="stat-user-msgs">—</span>
+					</div>
+					<div class="stat-row">
+						<span class="stat-row-label">Assistant</span>
+						<span class="stat-row-value" id="stat-assistant-msgs">—</span>
+					</div>
+					<div class="stat-row">
+						<span class="stat-row-label">Tool Results</span>
+						<span class="stat-row-value muted" id="stat-tool-msgs">—</span>
+					</div>
+				</div>
+				<div class="stat-card models-card">
+					<div class="stat-label">Models</div>
+					<div class="models-list" id="stat-models"></div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<main class="messages-container" id="messages">
+		<div class="empty-state">
+			<div class="empty-icon">◇</div>
+			<div class="empty-text">No session loaded</div>
+			<div class="empty-hint">Paste a GitHub Gist URL above to view a session</div>
+		</div>
+	</main>
+
+	<script>
+		function copyUrl() {
+			const input = document.getElementById('gist-url');
+			const btn = document.querySelector('.copy-btn');
+
+			if (input.value) {
+				navigator.clipboard.writeText(input.value).then(() => {
+					btn.classList.add('copied');
+					btn.textContent = '✓';
+					setTimeout(() => {
+						btn.classList.remove('copied');
+						btn.textContent = '📋';
+					}, 2000);
+				});
+			}
+		}
+
+		// State
+		let sessionData = {
+			messages: [],
+			stats: {
+				inputTokens: 0,
+				outputTokens: 0,
+				cacheTokens: 0,
+				startTime: null,
+				endTime: null,
+				activeTime: 0,
+				models: new Set()
+			}
+		};
+
+		async function loadSession() {
+			const input = document.getElementById('gist-url').value.trim();
+			const status = document.getElementById('status');
+			const messagesDiv = document.getElementById('messages');
+			const statsDiv = document.getElementById('session-stats');
+
+			if (!input) {
+				status.textContent = 'Please enter a gist URL';
+				status.className = 'status error';
+				return;
+			}
+
+			status.textContent = 'Loading...';
+			status.className = 'status';
+			messagesDiv.innerHTML = '';
+			statsDiv.classList.remove('visible');
+
+			// Reset stats
+			sessionData = {
+				messages: [],
+				stats: {
+					inputTokens: 0,
+					outputTokens: 0,
+					cacheTokens: 0,
+					startTime: null,
+					endTime: null,
+					activeTime: 0,
+					models: new Set()
+				}
+			};
+
+			try {
+				const rawUrl = convertToRawUrl(input);
+				status.textContent = 'Fetching session...';
+
+				const response = await fetch(rawUrl);
+				if (!response.ok) {
+					throw new Error('Failed to fetch: ' + response.status);
+				}
+
+				const text = await response.text();
+				parseJsonl(text);
+				calculateActiveTime();
+
+				status.textContent = '';
+				renderStats();
+				renderMessages();
+				statsDiv.classList.add('visible');
+
+			} catch (err) {
+				status.textContent = 'Error: ' + err.message;
+				status.className = 'status error';
+			}
+		}
+
+		function convertToRawUrl(url) {
+			if (url.includes('gist.githubusercontent.com')) {
+				return url;
+			}
+			const match = url.match(/gist\.github\.com\/([^\/]+)\/([a-f0-9]+)/i);
+			if (match) {
+				return 'https://gist.githubusercontent.com/' + match[1] + '/' + match[2] + '/raw';
+			}
+			return url;
+		}
+
+		function parseJsonl(text) {
+			const lines = text.trim().split('\n');
+
+			for (const line of lines) {
+				if (!line.trim()) continue;
+				try {
+					const obj = JSON.parse(line);
+
+					// Skip non-message types
+					if (obj.type === 'summary') continue;
+					if (obj.type === 'file-history-snapshot') continue;
+
+					// Skip meta/system messages
+					if (obj.isMeta === true) continue;
+
+					// Mark compaction summaries
+					const isCompaction = obj.isCompactSummary === true;
+
+					let msg = null;
+					let timestamp = obj.timestamp ? new Date(obj.timestamp) : null;
+
+					// Handle nested message format
+					if (obj.message && obj.message.role) {
+						msg = {
+							role: obj.message.role,
+							content: parseContent(obj.message.content),
+							model: obj.message.model || null,
+							usage: obj.message.usage || null,
+							timestamp: timestamp,
+							isCompaction: isCompaction
+						};
+					}
+					// Handle flat format
+					else if (obj.role) {
+						msg = {
+							role: obj.role,
+							content: parseContent(obj.content),
+							model: obj.model || null,
+							usage: obj.usage || null,
+							timestamp: timestamp,
+							isCompaction: isCompaction
+						};
+					}
+
+					if (msg) {
+						// Mark user messages that only contain tool_result blocks
+						// (these are API responses to tool calls, not actual user messages)
+						if (msg.role === 'user' && isOnlyToolResults(msg.content)) {
+							msg.role = 'tool_results';
+						}
+
+						// Mark user messages that are system output (local-command-stdout)
+						if (msg.role === 'user' && isSystemOutput(msg.content)) {
+							msg.role = 'system_output';
+						}
+
+						// Skip messages with empty/system-only content
+						if (isEmptyMessage(msg.content)) {
+							continue;
+						}
+
+						sessionData.messages.push(msg);
+
+						// Update stats
+						if (timestamp) {
+							if (!sessionData.stats.startTime || timestamp < sessionData.stats.startTime) {
+								sessionData.stats.startTime = timestamp;
+							}
+							if (!sessionData.stats.endTime || timestamp > sessionData.stats.endTime) {
+								sessionData.stats.endTime = timestamp;
+							}
+						}
+
+						if (msg.model) {
+							sessionData.stats.models.add(formatModelName(msg.model));
+						}
+
+						if (msg.usage) {
+							sessionData.stats.inputTokens += msg.usage.input_tokens || 0;
+							sessionData.stats.outputTokens += msg.usage.output_tokens || 0;
+							sessionData.stats.cacheTokens += msg.usage.cache_read_input_tokens || 0;
+						}
+					}
+				} catch (e) {
+					// Skip invalid lines
+				}
+			}
+		}
+
+		function parseContent(content) {
+			if (!content) return [];
+			if (typeof content === 'string') {
+				return [{ type: 'text', text: content }];
+			}
+			if (Array.isArray(content)) {
+				return content;
+			}
+			return [];
+		}
+
+		function isOnlyToolResults(content) {
+			if (!content || !Array.isArray(content) || content.length === 0) {
+				return false;
+			}
+			return content.every(block => block.type === 'tool_result');
+		}
+
+		function isEmptyMessage(content) {
+			if (!content || content.length === 0) return true;
+
+			// Check if all content blocks are empty or system tags
+			for (const block of content) {
+				if (block.type === 'text') {
+					const text = block.text || '';
+					// Skip empty text
+					if (!text.trim()) continue;
+					// Skip empty local-command-stdout only
+					const stdoutMatch = text.match(/^<local-command-stdout>([\s\S]*)<\/local-command-stdout>$/);
+					if (stdoutMatch && !stdoutMatch[1].trim()) continue;
+					// Has real content
+					return false;
+				} else {
+					// Other block types (tool_use, tool_result, etc.) count as content
+					return false;
+				}
+			}
+			return true;
+		}
+
+		function isSystemOutput(content) {
+			if (!content || content.length === 0) return false;
+
+			// Check if all content blocks are local-command-stdout with content
+			for (const block of content) {
+				if (block.type === 'text') {
+					const text = block.text || '';
+					if (!text.trim()) continue;
+					// Check for non-empty local-command-stdout
+					const stdoutMatch = text.match(/^<local-command-stdout>([\s\S]*)<\/local-command-stdout>$/);
+					if (stdoutMatch && stdoutMatch[1].trim()) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+
+		function calculateActiveTime() {
+			// Active time = sum of (user message -> last message before next user message)
+			// This excludes time user spent thinking/reading between interactions
+			const messages = sessionData.messages;
+			let activeTime = 0;
+			let currentUserTimestamp = null;
+			let lastMessageTimestamp = null;
+
+			for (let i = 0; i < messages.length; i++) {
+				const msg = messages[i];
+				const timestamp = msg.timestamp;
+
+				if (!timestamp) continue;
+
+				if (msg.role === 'user') {
+					// If we had a previous user message, calculate the active time for that block
+					if (currentUserTimestamp && lastMessageTimestamp) {
+						activeTime += lastMessageTimestamp - currentUserTimestamp;
+					}
+					// Start a new block
+					currentUserTimestamp = timestamp;
+					lastMessageTimestamp = timestamp;
+				} else {
+					// Track the last non-user message timestamp
+					if (currentUserTimestamp) {
+						lastMessageTimestamp = timestamp;
+					}
+				}
+			}
+
+			// Don't forget the last block (from last user message to final message)
+			if (currentUserTimestamp && lastMessageTimestamp) {
+				activeTime += lastMessageTimestamp - currentUserTimestamp;
+			}
+
+			sessionData.stats.activeTime = activeTime;
+		}
+
+		function formatModelName(model) {
+			if (!model) return 'Unknown';
+			model = model.replace('claude-', '');
+
+			if (model.startsWith('opus-4-5')) return 'Opus 4.5';
+			if (model.startsWith('sonnet-4')) return 'Sonnet 4';
+			if (model.startsWith('sonnet-3-5') || model.startsWith('3-5-sonnet')) return 'Sonnet 3.5';
+			if (model.startsWith('haiku-4-5')) return 'Haiku 4.5';
+			if (model.startsWith('haiku-3-5') || model.startsWith('3-5-haiku')) return 'Haiku 3.5';
+
+			const parts = model.split('-');
+			return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+		}
+
+		function formatTokenCount(count) {
+			if (count >= 1000000) {
+				return (count / 1000000).toFixed(1) + '<span class="unit">M</span>';
+			}
+			if (count >= 1000) {
+				return (count / 1000).toFixed(1) + '<span class="unit">K</span>';
+			}
+			return count.toString();
+		}
+
+		function formatTokenCountSimple(count) {
+			if (count >= 1000000) {
+				return (count / 1000000).toFixed(1) + 'M';
+			}
+			if (count >= 1000) {
+				return (count / 1000).toFixed(1) + 'K';
+			}
+			return count.toString();
+		}
+
+		function formatDuration(ms) {
+			const seconds = Math.floor(ms / 1000);
+			const minutes = Math.floor(seconds / 60);
+			const hours = Math.floor(minutes / 60);
+
+			if (hours > 0) {
+				const remainingMins = minutes % 60;
+				return hours + '<span class="unit">h</span> ' + remainingMins + '<span class="unit">m</span>';
+			}
+			if (minutes > 0) {
+				return minutes + '<span class="unit">m</span>';
+			}
+			return seconds + '<span class="unit">s</span>';
+		}
+
+		function formatDurationSimple(ms) {
+			const seconds = Math.floor(ms / 1000);
+			const minutes = Math.floor(seconds / 60);
+			const hours = Math.floor(minutes / 60);
+
+			if (hours > 0) {
+				const remainingMins = minutes % 60;
+				return hours + 'h ' + remainingMins + 'm';
+			}
+			if (minutes > 0) {
+				return minutes + 'm';
+			}
+			return seconds + 's';
+		}
+
+		function formatTime(date) {
+			if (!date) return '';
+			return date.toLocaleTimeString('en-US', {
+				hour: 'numeric',
+				minute: '2-digit',
+				hour12: true,
+				timeZoneName: 'short'
+			});
+		}
+
+		function renderStats() {
+			const stats = sessionData.stats;
+			const messages = sessionData.messages;
+
+			// Count messages by role
+			const userMsgs = messages.filter(m => m.role === 'user').length;
+			const assistantMsgs = messages.filter(m => m.role === 'assistant').length;
+			const toolMsgs = messages.filter(m => m.role === 'tool_results').length;
+
+			document.getElementById('stat-user-msgs').textContent = userMsgs;
+			document.getElementById('stat-assistant-msgs').textContent = assistantMsgs;
+			document.getElementById('stat-tool-msgs').textContent = toolMsgs;
+
+			document.getElementById('stat-input').textContent = formatTokenCountSimple(stats.inputTokens);
+			document.getElementById('stat-output').textContent = formatTokenCountSimple(stats.outputTokens);
+			document.getElementById('stat-cache').textContent = formatTokenCountSimple(stats.cacheTokens);
+
+			if (stats.startTime && stats.endTime) {
+				const duration = stats.endTime - stats.startTime;
+				document.getElementById('stat-duration').textContent = formatDurationSimple(duration);
+			}
+
+			if (stats.activeTime > 0) {
+				document.getElementById('stat-active-time').textContent = formatDurationSimple(stats.activeTime);
+			}
+
+			const modelsDiv = document.getElementById('stat-models');
+			modelsDiv.innerHTML = '';
+			stats.models.forEach(model => {
+				const badge = document.createElement('span');
+				badge.className = 'model-badge';
+				badge.textContent = model;
+				modelsDiv.appendChild(badge);
+			});
+		}
+
+		let currentView = 'collapsed';
+
+		function setView(view) {
+			currentView = view;
+			const container = document.getElementById('messages');
+			const buttons = document.querySelectorAll('.view-btn');
+
+			buttons.forEach(btn => {
+				btn.classList.toggle('active', btn.dataset.view === view);
+			});
+
+			if (view === 'expanded') {
+				container.classList.add('expanded-view');
+			} else {
+				container.classList.remove('expanded-view');
+			}
+		}
+
+		function toggleConversation(groupId) {
+			if (currentView === 'expanded') return;
+
+			const group = document.getElementById(groupId);
+			if (group) {
+				const wasExpanded = group.classList.contains('expanded');
+
+				// Collapse all groups first
+				document.querySelectorAll('.conversation-group').forEach(g => {
+					g.classList.remove('expanded');
+				});
+
+				// Toggle clicked group
+				if (!wasExpanded) {
+					group.classList.add('expanded');
+					// Scroll to put user message at top
+					setTimeout(() => {
+						group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+					}, 50);
+				}
+			}
+		}
+
+		function renderMessages() {
+			const container = document.getElementById('messages');
+			container.innerHTML = '';
+
+			// Show view controls
+			document.getElementById('view-controls').classList.add('visible');
+
+			// Group messages: each user message starts a new group
+			const groups = [];
+			let currentGroup = null;
+
+			sessionData.messages.forEach((msg, index) => {
+				if (msg.role === 'user' && !msg.isCompaction) {
+					// Start a new conversation group
+					currentGroup = {
+						userMsg: msg,
+						userIndex: index,
+						responses: []
+					};
+					groups.push(currentGroup);
+				} else if (currentGroup) {
+					// Add to current group's responses
+					currentGroup.responses.push({ msg, index });
+				} else {
+					// Message before first user message (like compaction)
+					groups.push({
+						userMsg: null,
+						userIndex: index,
+						responses: [{ msg, index }]
+					});
+				}
+			});
+
+			// Render groups
+			groups.forEach((group, groupIndex) => {
+				const groupDiv = document.createElement('div');
+				groupDiv.className = 'conversation-group';
+				groupDiv.id = 'group-' + groupIndex;
+
+				if (group.userMsg) {
+					// Calculate duration from user message to last response
+					let duration = null;
+					if (group.userMsg.timestamp && group.responses.length > 0) {
+						const lastResponse = group.responses[group.responses.length - 1];
+						if (lastResponse.msg.timestamp) {
+							duration = lastResponse.msg.timestamp - group.userMsg.timestamp;
+						}
+					}
+
+					// Render user message
+					const userDiv = document.createElement('div');
+					userDiv.className = 'message user';
+					userDiv.style.animationDelay = Math.min(groupIndex * 30, 300) + 'ms';
+					userDiv.innerHTML = renderUserMessage(group.userMsg, group.responses.length, duration);
+					userDiv.onclick = () => toggleConversation('group-' + groupIndex);
+					groupDiv.appendChild(userDiv);
+				}
+
+				// Render response messages in a container
+				if (group.responses.length > 0) {
+					const responsesDiv = document.createElement('div');
+					responsesDiv.className = 'response-messages';
+
+					group.responses.forEach(({ msg, index }) => {
+						const div = document.createElement('div');
+						div.className = 'message ' + msg.role;
+
+						if (msg.isCompaction) {
+							div.className = 'message compaction';
+							div.innerHTML = renderCompactionMessage(msg);
+						} else if (msg.role === 'assistant') {
+							div.innerHTML = renderAssistantMessage(msg);
+						} else if (msg.role === 'tool_results') {
+							div.innerHTML = renderToolResultsMessage(msg);
+						} else if (msg.role === 'system_output') {
+							div.innerHTML = renderSystemOutputMessage(msg);
+						}
+
+						responsesDiv.appendChild(div);
+					});
+
+					groupDiv.appendChild(responsesDiv);
+				}
+
+				container.appendChild(groupDiv);
+			});
+		}
+
+		function renderSystemOutputMessage(msg) {
+			const time = formatTime(msg.timestamp);
+			const content = renderContent(msg.content, 'system');
+
+			return `
+				<div class="message-bubble">
+					<div class="message-header">
+						<div class="header-left">
+							<span class="system-output-icon">💬</span>
+							<span class="message-role">System</span>
+						</div>
+						<div class="header-right">
+							${time ? `<span class="message-time">${time}</span>` : ''}
+						</div>
+					</div>
+					<div class="message-content">${content}</div>
+				</div>
+			`;
+		}
+
+		function renderCompactionMessage(msg) {
+			const time = formatTime(msg.timestamp);
+			const id = 'compaction-' + Math.random().toString(36).substr(2, 9);
+
+			// Extract the text content
+			let content = '';
+			for (const block of msg.content) {
+				if (block.type === 'text' && block.text) {
+					content = block.text;
+					break;
+				}
+			}
+
+			// Remove the standard intro line for cleaner display
+			content = content.replace(/^This session is being continued from a previous conversation that ran out of context\. The conversation is summarized below:\n?/i, '');
+
+			return `
+				<details class="compaction-details" id="${id}">
+					<summary class="compaction-summary">
+						<span class="compaction-icon">📦</span>
+						<span class="compaction-label">Context Compaction</span>
+						${time ? `<span class="compaction-time">${time}</span>` : ''}
+					</summary>
+					<div class="compaction-content">
+						<pre>${escapeHtml(content)}</pre>
+					</div>
+				</details>
+			`;
+		}
+
+		function renderToolResultsMessage(msg) {
+			const time = formatTime(msg.timestamp);
+			const results = msg.content.map(block => {
+				if (block.type !== 'tool_result') return '';
+
+				let content = '';
+				if (typeof block.content === 'string') {
+					content = block.content;
+				} else if (Array.isArray(block.content)) {
+					content = block.content
+						.filter(c => c.type === 'text')
+						.map(c => c.text)
+						.join('\n');
+				}
+
+				// Truncate long results
+				const maxLen = 500;
+				let truncated = false;
+				if (content.length > maxLen) {
+					content = content.substring(0, maxLen);
+					truncated = true;
+				}
+
+				const isError = block.is_error;
+				return `<div class="tool-result-item ${isError ? 'error' : ''}">
+					<pre>${escapeHtml(content)}${truncated ? '\n...(truncated)' : ''}</pre>
+				</div>`;
+			}).join('');
+
+			return `
+				<div class="message-bubble">
+					<div class="message-header">
+						<div class="header-left">
+							<span class="tool-results-icon">🔧</span>
+							<span class="message-role">Tool Results</span>
+						</div>
+						<div class="header-right">
+							${time ? `<span class="message-time">${time}</span>` : ''}
+						</div>
+					</div>
+					<div class="message-content">${results}</div>
+				</div>
+			`;
+		}
+
+		function renderUserMessage(msg, responseCount = 0, duration = null) {
+			const time = formatTime(msg.timestamp);
+			const content = renderContent(msg.content, 'user');
+			const hasResponses = responseCount > 0;
+			const durationStr = duration ? ` (${formatDurationSimple(duration)})` : '';
+
+			return `
+				<div class="message-bubble">
+					<div class="message-header">
+						<span class="message-role">You ${hasResponses ? `<span class="expand-indicator">▼ ${responseCount}</span>` : ''}</span>
+						${time ? `<span class="message-time">${time}${durationStr}</span>` : ''}
+					</div>
+					<div class="message-content">${content}</div>
+				</div>
+			`;
+		}
+
+		function renderAssistantMessage(msg) {
+			const time = formatTime(msg.timestamp);
+			const model = msg.model ? formatModelName(msg.model) : null;
+			const content = renderContent(msg.content, 'assistant');
+			const tokens = renderTokenUsage(msg.usage);
+
+			return `
+				<div class="message-bubble">
+					<div class="message-header">
+						<div class="header-left">
+							<div class="avatar">◈</div>
+							<span class="message-role">Claude</span>
+							${model ? `<span class="model-tag">${model}</span>` : ''}
+						</div>
+						<div class="header-right">
+							${time ? `<span class="message-time">${time}</span>` : ''}
+						</div>
+					</div>
+					<div class="message-content">${content}</div>
+					${tokens}
+				</div>
+			`;
+		}
+
+		function renderContent(content, role) {
+			if (!content || !Array.isArray(content)) return '';
+
+			return content.map(block => {
+				switch (block.type) {
+					case 'text':
+						return renderTextBlock(block.text);
+					case 'tool_use':
+						return renderToolUse(block);
+					case 'tool_result':
+						return renderToolResult(block);
+					case 'thinking':
+						return renderThinking(block);
+					default:
+						return '';
+				}
+			}).join('');
+		}
+
+		function renderTextBlock(text) {
+			if (!text) return '';
+
+			// Check for slash command format
+			const commandMatch = text.match(/<command-name>([^<]+)<\/command-name>\s*<command-message>[^<]*<\/command-message>\s*<command-args>([^<]*)<\/command-args>/);
+			if (commandMatch) {
+				const cmd = commandMatch[1];
+				const args = commandMatch[2].trim();
+				return `<div class="slash-command"><span class="command-slash">${escapeHtml(cmd)}</span>${args ? ' <span class="command-args">' + escapeHtml(args) + '</span>' : ''}</div>`;
+			}
+
+			// Check for local-command-stdout (skip if empty, show content if present)
+			const stdoutMatch = text.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
+			if (stdoutMatch) {
+				const content = stdoutMatch[1].trim();
+				if (!content) return ''; // Skip empty stdout
+				return `<div class="local-stdout">${escapeHtml(content)}</div>`;
+			}
+
+			return parseMarkdown(text);
+		}
+
+		function parseMarkdown(text) {
+			// Escape HTML first but preserve structure for parsing
+			let html = text;
+
+			// Code blocks (``` ... ```) - must be done before escaping
+			html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+				return `<pre><code class="language-${lang}">${escapeHtml(code.trim())}</code></pre>`;
+			});
+
+			// Now split by code blocks to only process non-code parts
+			const parts = html.split(/(<pre><code[\s\S]*?<\/code><\/pre>)/);
+			html = parts.map(part => {
+				if (part.startsWith('<pre>')) return part;
+				return parseInlineMarkdown(part);
+			}).join('');
+
+			return html;
+		}
+
+		function parseInlineMarkdown(text) {
+			let html = escapeHtml(text);
+
+			// Inline code (must be before other formatting)
+			html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+			// Headers
+			html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+			html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+			html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+			html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+			// Bold and italic
+			html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+			html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+			html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+			html = html.replace(/___(.+?)___/g, '<strong><em>$1</em></strong>');
+			html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+			html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+
+			// Links
+			html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+			// Blockquotes
+			html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+			// Horizontal rules
+			html = html.replace(/^---$/gm, '<hr>');
+			html = html.replace(/^\*\*\*$/gm, '<hr>');
+
+			// Unordered lists
+			html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+			html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+			// Ordered lists
+			html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+			// Paragraphs - split by double newlines
+			const blocks = html.split(/\n\n+/);
+			html = blocks.map(block => {
+				block = block.trim();
+				if (!block) return '';
+				// Don't wrap if already a block element
+				if (block.match(/^<(h[1-4]|ul|ol|li|blockquote|pre|hr)/)) {
+					return block;
+				}
+				// Convert single newlines to <br> within paragraphs
+				block = block.replace(/\n/g, '<br>');
+				return `<p>${block}</p>`;
+			}).join('\n');
+
+			return html;
+		}
+
+		function renderToolUse(block) {
+			const name = block.name || 'Tool';
+			const id = 'tool-' + Math.random().toString(36).substr(2, 9);
+
+			let iconClass = 'default';
+			let icon = '🔧';
+			let desc = '';
+
+			// Parse input once for all tool types
+			let input = null;
+			if (block.input) {
+				try {
+					input = typeof block.input === 'string' ? JSON.parse(block.input) : block.input;
+				} catch (e) {
+					input = null;
+				}
+			}
+
+			if (name === 'Bash') {
+				iconClass = 'bash';
+				icon = '💻';
+				if (input) {
+					desc = input.description || input.command || '';
+				}
+			} else if (name === 'Read') {
+				iconClass = 'read';
+				icon = '📖';
+				if (input) {
+					desc = input.file_path || '';
+				}
+			} else if (name === 'Write') {
+				iconClass = 'write';
+				icon = '📝';
+				if (input) {
+					desc = input.file_path || '';
+				}
+			} else if (name === 'Edit' || name === 'MultiEdit') {
+				iconClass = 'edit';
+				icon = '✏️';
+				if (input) {
+					desc = input.file_path || '';
+				}
+			} else if (name === 'Glob' || name === 'Grep') {
+				iconClass = 'search';
+				icon = '🔍';
+				if (input) {
+					desc = input.pattern || '';
+				}
+			} else if (name === 'Task') {
+				iconClass = 'default';
+				icon = '🤖';
+				if (input) {
+					desc = input.description || input.prompt?.substring(0, 50) || '';
+				}
+			} else if (name === 'TodoWrite') {
+				iconClass = 'default';
+				icon = '📋';
+				if (input && input.todos) {
+					desc = `${input.todos.length} items`;
+				}
+			} else if (name === 'WebFetch' || name === 'WebSearch') {
+				iconClass = 'default';
+				icon = '🌐';
+				if (input) {
+					desc = input.url || input.query || '';
+				}
+			} else if (name === 'LS') {
+				iconClass = 'default';
+				icon = '📁';
+				if (input) {
+					desc = input.path || '';
+				}
+			} else if (name === 'AskUserQuestion') {
+				iconClass = 'default';
+				icon = '❓';
+			} else if (name === 'NotebookEdit' || name === 'NotebookRead') {
+				iconClass = 'default';
+				icon = '📓';
+				if (input) {
+					desc = input.notebook_path || '';
+				}
+			}
+
+			let contentHtml = '';
+			if (input) {
+				contentHtml = `<pre><code>${escapeHtml(JSON.stringify(input, null, 2))}</code></pre>`;
+			} else if (block.input) {
+				contentHtml = `<pre><code>${escapeHtml(String(block.input))}</code></pre>`;
+			}
+
+			return `
+				<div class="tool-block" id="${id}">
+					<div class="tool-header" onclick="toggleTool('${id}')">
+						<div class="tool-header-left">
+							<div class="tool-icon ${iconClass}">${icon}</div>
+							<span class="tool-name">${escapeHtml(name)}</span>
+							${desc ? `<span class="tool-desc">${escapeHtml(desc)}</span>` : ''}
+						</div>
+						<span class="tool-toggle">▼</span>
+					</div>
+					<div class="tool-content">${contentHtml}</div>
+				</div>
+			`;
+		}
+
+		function renderToolResult(block) {
+			let content = '';
+			const isError = block.is_error;
+
+			if (typeof block.content === 'string') {
+				content = block.content;
+			} else if (Array.isArray(block.content)) {
+				content = block.content
+					.filter(c => c.type === 'text')
+					.map(c => c.text)
+					.join('\n');
+			}
+
+			if (!content) return '';
+
+			// Truncate long results
+			const maxLen = 1000;
+			let truncated = false;
+			if (content.length > maxLen) {
+				content = content.substring(0, maxLen);
+				truncated = true;
+			}
+
+			return `
+				<div class="tool-result ${isError ? 'error' : ''}">
+					<pre>${escapeHtml(content)}${truncated ? '\n...(truncated)' : ''}</pre>
+				</div>
+			`;
+		}
+
+		function renderThinking(block) {
+			if (!block.text) return '';
+			return `
+				<div class="thinking-block">
+					<div class="thinking-label">🧠 Thinking</div>
+					<div class="thinking-content">${escapeHtml(block.text)}</div>
+				</div>
+			`;
+		}
+
+		function renderTokenUsage(usage) {
+			if (!usage) return '';
+
+			const parts = [];
+			if (usage.input_tokens) {
+				parts.push(`<div class="token-stat input"><span class="icon">↓</span>${formatTokenCount(usage.input_tokens)} in</div>`);
+			}
+			if (usage.output_tokens) {
+				parts.push(`<div class="token-stat output"><span class="icon">↑</span>${formatTokenCount(usage.output_tokens)} out</div>`);
+			}
+			if (usage.cache_read_input_tokens) {
+				parts.push(`<div class="token-stat cache"><span class="icon">⚡</span>${formatTokenCount(usage.cache_read_input_tokens)} cache</div>`);
+			}
+
+			if (parts.length === 0) return '';
+			return `<div class="token-usage">${parts.join('')}</div>`;
+		}
+
+		function toggleTool(id) {
+			const el = document.getElementById(id);
+			if (el) {
+				el.classList.toggle('expanded');
+			}
+		}
+
+		function escapeHtml(text) {
+			if (!text) return '';
+			const div = document.createElement('div');
+			div.textContent = text;
+			return div.innerHTML;
+		}
+
+		// URL param support
+		const params = new URLSearchParams(window.location.search);
+		const urlParam = params.get('url');
+		if (urlParam) {
+			document.getElementById('gist-url').value = urlParam;
+			loadSession();
+		}
+	</script>
+</body>
+</html>

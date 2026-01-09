@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/robzolkos/claude-session-export/internal/gist"
-	"github.com/robzolkos/claude-session-export/internal/render"
 	"github.com/robzolkos/claude-session-export/internal/session"
 	"github.com/robzolkos/claude-session-export/internal/web"
 )
@@ -21,11 +20,7 @@ import (
 var version = "dev"
 
 // reorderArgs moves flags before positional arguments so Go's flag package can parse them.
-// Go's flag.Parse stops at the first non-flag argument, so "json file.jsonl --gist" fails.
-// This reorders to "json --gist file.jsonl".
-// It correctly handles flags with values like "-o dir" or "--output=dir".
 func reorderArgs(args []string) []string {
-	// Flags that take a value (without =)
 	valueFlags := map[string]bool{
 		"-o": true, "--output": true,
 		"--limit": true, "--max-matches": true,
@@ -36,7 +31,6 @@ func reorderArgs(args []string) []string {
 		arg := args[i]
 		if strings.HasPrefix(arg, "-") {
 			flags = append(flags, arg)
-			// Check if this flag takes a separate value argument
 			if !strings.Contains(arg, "=") && valueFlags[arg] && i+1 < len(args) {
 				i++
 				flags = append(flags, args[i])
@@ -61,10 +55,10 @@ func Run(args []string) error {
 		return runJSON(args[1:])
 	case "web":
 		return runWeb(args[1:])
-	case "all":
-		return runAll(args[1:])
 	case "search":
 		return runSearch(args[1:])
+	case "open":
+		return runOpen(args[1:])
 	case "version", "--version", "-v":
 		fmt.Printf("claude-session-export %s\n", version)
 		return nil
@@ -78,34 +72,30 @@ func Run(args []string) error {
 }
 
 func printHelp() {
-	fmt.Println(`claude-session-export - Transform Claude Code sessions into shareable HTML
+	fmt.Println(`claude-session-export - Export Claude Code sessions to GitHub Gist
 
 USAGE:
     claude-session-export [COMMAND] [OPTIONS]
 
 COMMANDS:
     local    Browse and export local Claude Code sessions (default)
-    json     Export a specific JSON or JSONL file
+    json     Export a specific JSONL file
     web      Fetch and export sessions from Claude API
-    all      Export all local sessions to a browsable archive
     search   Search across all sessions for a term
+    open     Open a gist URL in the session viewer
 
 OPTIONS:
-    -o, --output DIR     Output directory (default: temp directory)
-    --gist               Upload to GitHub Gist (private by default)
-    --public             Make gist public (use with --gist)
-    --open               Open in browser when done
-    --include-json       Include original JSON/JSONL file
-    --quiet              Suppress output
+    -o, --output DIR     Save JSONL locally instead of uploading to Gist
+    --no-open            Don't open viewer after uploading
     -h, --help           Show this help message
     -v, --version        Show version
 
 EXAMPLES:
-    claude-session-export                     # Interactive session picker
-    claude-session-export json session.jsonl  # Convert specific file
-    claude-session-export all --open          # Convert all sessions
-    claude-session-export web SESSION_ID      # Fetch from API
-    claude-session-export search "burrito"    # Search all sessions`)
+    claude-session-export                          # Interactive picker, upload to Gist
+    claude-session-export json session.jsonl      # Upload specific file to Gist
+    claude-session-export web SESSION_ID          # Fetch from API, upload to Gist
+    claude-session-export search "error"          # Search sessions
+    claude-session-export open https://gist.github.com/user/id`)
 }
 
 func runLocal(args []string) error {
@@ -113,17 +103,13 @@ func runLocal(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
-	publicGist := fs.Bool("public", false, "Make gist public")
-	openBrowser := fs.Bool("open", false, "Open in browser when done")
-	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
-	quiet := fs.Bool("quiet", false, "Suppress output")
+	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 	limit := fs.Int("limit", 20, "Maximum number of sessions to show")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 
-	// Find local sessions
 	sessions, err := session.FindLocalSessions(*limit)
 	if err != nil {
 		return fmt.Errorf("finding sessions: %w", err)
@@ -133,16 +119,14 @@ func runLocal(args []string) error {
 		return errors.New("no sessions found in ~/.claude/projects")
 	}
 
-	// Load summaries for display
 	session.LoadSessionSummaries(sessions)
 
-	// Interactive selection
 	selected, err := selectSession(sessions)
 	if err != nil {
 		return err
 	}
 
-	return convertSession(selected.Path, *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
+	return exportSession(selected.Path, *outputDir, *uploadGist, !*noOpen)
 }
 
 func runJSON(args []string) error {
@@ -150,10 +134,7 @@ func runJSON(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
-	publicGist := fs.Bool("public", false, "Make gist public")
-	openBrowser := fs.Bool("open", false, "Open in browser when done")
-	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
-	quiet := fs.Bool("quiet", false, "Suppress output")
+	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
@@ -165,12 +146,11 @@ func runJSON(args []string) error {
 
 	path := fs.Arg(0)
 
-	// Check if it's a URL
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-		return convertURL(path, *outputDir, *uploadGist, *publicGist, *openBrowser, *quiet)
+		return exportURL(path, *outputDir, *uploadGist, !*noOpen)
 	}
 
-	return convertSession(path, *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
+	return exportSession(path, *outputDir, *uploadGist, !*noOpen)
 }
 
 func runWeb(args []string) error {
@@ -178,10 +158,7 @@ func runWeb(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
-	publicGist := fs.Bool("public", false, "Make gist public")
-	openBrowser := fs.Bool("open", false, "Open in browser when done")
-	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
-	quiet := fs.Bool("quiet", false, "Suppress output")
+	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
@@ -193,10 +170,7 @@ func runWeb(args []string) error {
 
 	sessionID := fs.Arg(0)
 
-	// Fetch session from API
-	if !*quiet {
-		fmt.Printf("Fetching session %s from API...\n", sessionID)
-	}
+	fmt.Printf("Fetching session %s from API...\n", sessionID)
 
 	sess, err := web.FetchSession(sessionID)
 	if err != nil {
@@ -215,68 +189,7 @@ func runWeb(args []string) error {
 	}
 	tmpFile.Close()
 
-	return convertSession(tmpFile.Name(), *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
-}
-
-func runAll(args []string) error {
-	fs := flag.NewFlagSet("all", flag.ExitOnError)
-	outputDir := fs.String("o", "", "Output directory")
-	fs.StringVar(outputDir, "output", "", "Output directory")
-	openBrowser := fs.Bool("open", false, "Open in browser when done")
-	quiet := fs.Bool("quiet", false, "Suppress output")
-
-	if err := fs.Parse(reorderArgs(args)); err != nil {
-		return err
-	}
-
-	// Find all sessions organized by project
-	projects, err := session.FindAllSessions()
-	if err != nil {
-		return fmt.Errorf("finding sessions: %w", err)
-	}
-
-	if len(projects) == 0 {
-		return errors.New("no sessions found in ~/.claude/projects")
-	}
-
-	// Determine output directory
-	outDir := *outputDir
-	if outDir == "" {
-		var err error
-		outDir, err = os.MkdirTemp("", "claude-archive-*")
-		if err != nil {
-			return fmt.Errorf("creating temp directory: %w", err)
-		}
-	}
-
-	if !*quiet {
-		totalSessions := 0
-		for _, p := range projects {
-			totalSessions += len(p.Sessions)
-		}
-		fmt.Printf("Converting %d projects with %d sessions...\n", len(projects), totalSessions)
-	}
-
-	// Generate batch
-	gen := &render.BatchGenerator{
-		OutputDir: outDir,
-		Projects:  projects,
-	}
-
-	if err := gen.Generate(); err != nil {
-		return fmt.Errorf("generating archive: %w", err)
-	}
-
-	indexPath := filepath.Join(outDir, "index.html")
-	if !*quiet {
-		fmt.Printf("Archive created: %s\n", indexPath)
-	}
-
-	if *openBrowser {
-		openInBrowser(indexPath)
-	}
-
-	return nil
+	return exportSession(tmpFile.Name(), *outputDir, *uploadGist, !*noOpen)
 }
 
 func runSearch(args []string) error {
@@ -284,10 +197,7 @@ func runSearch(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
-	publicGist := fs.Bool("public", false, "Make gist public")
-	openBrowser := fs.Bool("open", false, "Open in browser when done")
-	includeJSON := fs.Bool("include-json", false, "Include original JSON file")
-	quiet := fs.Bool("quiet", false, "Suppress output")
+	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 	maxMatches := fs.Int("max-matches", 3, "Maximum matches to show per session")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
@@ -300,9 +210,7 @@ func runSearch(args []string) error {
 
 	query := fs.Arg(0)
 
-	if !*quiet {
-		fmt.Printf("Searching for \"%s\"...\n", query)
-	}
+	fmt.Printf("Searching for \"%s\"...\n", query)
 
 	results, err := session.SearchSessions(query)
 	if err != nil {
@@ -314,7 +222,6 @@ func runSearch(args []string) error {
 		return nil
 	}
 
-	// Display results with snippets
 	fmt.Printf("\nFound \"%s\" in %d sessions:\n\n", query, len(results))
 
 	for i, result := range results {
@@ -330,7 +237,6 @@ func runSearch(args []string) error {
 			matchCount,
 			matchWord)
 
-		// Show up to maxMatches snippets
 		showCount := matchCount
 		if showCount > *maxMatches {
 			showCount = *maxMatches
@@ -344,7 +250,6 @@ func runSearch(args []string) error {
 		fmt.Println()
 	}
 
-	// Interactive selection
 	fmt.Print("Enter number to export (or q to quit): ")
 
 	var input string
@@ -360,81 +265,93 @@ func runSearch(args []string) error {
 	}
 
 	selected := results[idx-1].SessionInfo
-	return convertSession(selected.Path, *outputDir, *uploadGist, *publicGist, *openBrowser, *includeJSON, *quiet)
+	return exportSession(selected.Path, *outputDir, *uploadGist, !*noOpen)
 }
 
-func convertSession(path, outputDir string, uploadGist, publicGist, openBrowser, includeJSON, quiet bool) error {
-	// Parse session
-	sess, err := session.ParseFile(path)
-	if err != nil {
-		return fmt.Errorf("parsing session: %w", err)
+func runOpen(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: claude-session-export open <gist-url>")
 	}
 
-	// Determine output directory
-	outDir := outputDir
-	if outDir == "" {
-		var err error
-		outDir, err = os.MkdirTemp("", "claude-transcript-*")
+	gistURL := args[0]
+	fmt.Printf("Opening viewer for: %s\n", gistURL)
+	return openGistInViewer(gistURL)
+}
+
+func exportSession(path, outputDir string, uploadGist, openBrowser bool) error {
+	// Validate file exists and is readable
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("cannot access file: %w", err)
+	}
+
+	// Default to gist upload unless output dir is specified
+	if !uploadGist && outputDir == "" {
+		uploadGist = true
+		openBrowser = true
+	}
+
+	if uploadGist {
+		// Create temp dir with just the JSONL file
+		tmpDir, err := os.MkdirTemp("", "claude-gist-*")
 		if err != nil {
 			return fmt.Errorf("creating temp directory: %w", err)
 		}
-	}
+		defer os.RemoveAll(tmpDir)
 
-	// Generate HTML
-	gen := &render.Generator{
-		Session:     sess,
-		OutputDir:   outDir,
-		IncludeJSON: includeJSON,
-		SourcePath:  path,
-	}
-
-	if err := gen.Generate(); err != nil {
-		return fmt.Errorf("generating HTML: %w", err)
-	}
-
-	indexPath := filepath.Join(outDir, "index.html")
-
-	if uploadGist {
-		// Upload to GitHub Gist
-		visibility := "private"
-		if publicGist {
-			visibility = "public"
-		}
-		if !quiet {
-			fmt.Printf("Uploading to GitHub Gist (%s)...\n", visibility)
+		// Copy JSONL file to temp dir
+		srcData, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading source file: %w", err)
 		}
 
-		gistURL, err := gist.Upload(outDir, publicGist)
+		destPath := filepath.Join(tmpDir, "session.jsonl")
+		if err := os.WriteFile(destPath, srcData, 0644); err != nil {
+			return fmt.Errorf("writing temp file: %w", err)
+		}
+
+		fmt.Println("Uploading to GitHub Gist...")
+
+		gistURL, err := gist.Upload(tmpDir, false)
 		if err != nil {
 			return fmt.Errorf("uploading gist: %w", err)
 		}
 
-		if !quiet {
-			fmt.Printf("Gist created: %s\n", gistURL)
-			fmt.Printf("Preview: https://gistpreview.github.io/?%s/index.html\n", extractGistID(gistURL))
-		}
+		fmt.Printf("Gist created: %s\n", gistURL)
 
 		if openBrowser {
-			previewURL := fmt.Sprintf("https://gistpreview.github.io/?%s/index.html", extractGistID(gistURL))
-			openInBrowser(previewURL)
+			if err := openGistInViewer(gistURL); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: could not open viewer: %v\n", err)
+			}
 		}
 	} else {
-		if !quiet {
-			fmt.Printf("Transcript created: %s\n", indexPath)
-		}
+		// Just copy to output dir if specified
+		if outputDir != "" {
+			if err := os.MkdirAll(outputDir, 0755); err != nil {
+				return fmt.Errorf("creating output directory: %w", err)
+			}
 
-		if openBrowser {
-			openInBrowser(indexPath)
+			srcData, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("reading source file: %w", err)
+			}
+
+			destPath := filepath.Join(outputDir, filepath.Base(path))
+			if err := os.WriteFile(destPath, srcData, 0644); err != nil {
+				return fmt.Errorf("writing output file: %w", err)
+			}
+
+			fmt.Printf("Session exported: %s\n", destPath)
+		} else {
+			fmt.Printf("Session: %s\n", path)
+			fmt.Println("Use --gist to upload to GitHub Gist, or -o to specify output directory")
 		}
 	}
 
 	return nil
 }
 
-func convertURL(url, outputDir string, uploadGist, publicGist, openBrowser, quiet bool) error {
-	if !quiet {
-		fmt.Printf("Fetching %s...\n", url)
-	}
+func exportURL(url, outputDir string, uploadGist, openBrowser bool) error {
+	fmt.Printf("Fetching %s...\n", url)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -451,8 +368,7 @@ func convertURL(url, outputDir string, uploadGist, publicGist, openBrowser, quie
 		return fmt.Errorf("reading response: %w", err)
 	}
 
-	// Create temp file
-	tmpFile, err := os.CreateTemp("", "session-*.json")
+	tmpFile, err := os.CreateTemp("", "session-*.jsonl")
 	if err != nil {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
@@ -463,7 +379,7 @@ func convertURL(url, outputDir string, uploadGist, publicGist, openBrowser, quie
 	}
 	tmpFile.Close()
 
-	return convertSession(tmpFile.Name(), outputDir, uploadGist, publicGist, openBrowser, false, quiet)
+	return exportSession(tmpFile.Name(), outputDir, uploadGist, openBrowser)
 }
 
 func selectSession(sessions []session.SessionInfo) (*session.SessionInfo, error) {
@@ -521,10 +437,20 @@ func openInBrowser(path string) error {
 	return cmd.Start()
 }
 
-func extractGistID(gistURL string) string {
-	parts := strings.Split(gistURL, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
+func openGistInViewer(gistURL string) error {
+	tmpFile, err := os.CreateTemp("", "session-viewer-*.html")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
 	}
-	return ""
+
+	if _, err := tmpFile.Write(viewerHTML); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("writing viewer: %w", err)
+	}
+	tmpFile.Close()
+
+	viewerPath := tmpFile.Name()
+	urlWithParam := "file://" + viewerPath + "?url=" + gistURL
+
+	return openInBrowser(urlWithParam)
 }
