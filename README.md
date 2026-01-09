@@ -60,6 +60,9 @@ claude-session-export
 # Export a specific JSONL file to Gist
 claude-session-export json my-session.jsonl
 
+# Create a shareable zip file with viewer
+claude-session-export --zip
+
 # Search across all your sessions
 claude-session-export search "database migration"
 
@@ -141,8 +144,9 @@ claude-session-export open https://gist.github.com/user/gist-id
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--output DIR` | `-o` | Save JSONL locally instead of uploading to Gist |
+| `--zip` | | Create a zip file with viewer and session data |
 | `--no-open` | | Don't open viewer after uploading |
-| `--limit N` | | Maximum sessions to show in picker (default: 20) |
+| `--limit N` | | Maximum sessions to show in picker (default: 30) |
 | `--max-matches N` | | Maximum snippets to show per session in search (default: 3) |
 | `--help` | `-h` | Show help message |
 | `--version` | `-v` | Show version number |
