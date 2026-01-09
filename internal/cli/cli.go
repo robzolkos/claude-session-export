@@ -104,7 +104,7 @@ func runLocal(args []string) error {
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
 	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
-	limit := fs.Int("limit", 20, "Maximum number of sessions to show")
+	limit := fs.Int("limit", 30, "Maximum number of sessions to show")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
@@ -382,24 +382,72 @@ func exportURL(url, outputDir string, uploadGist, openBrowser bool) error {
 	return exportSession(tmpFile.Name(), outputDir, uploadGist, openBrowser)
 }
 
+// ANSI color codes
+const (
+	colorReset  = "\033[0m"
+	colorDim    = "\033[2m"
+	colorBold   = "\033[1m"
+	colorCyan   = "\033[36m"
+	colorYellow = "\033[33m"
+)
+
 func selectSession(sessions []session.SessionInfo) (*session.SessionInfo, error) {
 	if len(sessions) == 0 {
 		return nil, errors.New("no sessions to select")
+	}
+
+	// Calculate max project name width for alignment
+	maxProjectWidth := 0
+	projectNames := make([]string, len(sessions))
+	for i, s := range sessions {
+		projectNames[i] = formatProjectName(s.ProjectName)
+		if len(projectNames[i]) > maxProjectWidth {
+			maxProjectWidth = len(projectNames[i])
+		}
+	}
+	// Cap at reasonable width
+	if maxProjectWidth > 30 {
+		maxProjectWidth = 30
 	}
 
 	fmt.Println("\nSelect a session:")
 	fmt.Println()
 
 	for i, s := range sessions {
+		projectName := projectNames[i]
+		if len(projectName) > 30 {
+			projectName = projectName[:27] + "..."
+		}
+
+		// Format time (use EndTime - last message time) in local timezone
+		displayTime := s.ModTime.Local()
+		if !s.EndTime.IsZero() {
+			displayTime = s.EndTime.Local()
+		}
+		timeStr := displayTime.Format("Jan 02 3:04pm")
+
+		// Build prompt count string
+		promptStr := ""
+		if s.UserMsgCount > 0 {
+			promptStr = fmt.Sprintf("%4d prompts", s.UserMsgCount)
+		}
+
+		// Summary - truncate to fit
 		summary := s.Summary
-		if len(summary) > 60 {
-			summary = summary[:60] + "..."
-		}
 		if summary == "" {
-			summary = "(No summary)"
+			summary = "(No summary available)"
 		}
-		fmt.Printf("  %2d. [%s] %s\n", i+1, s.ModTime.Format("Jan 02"), summary)
-		fmt.Printf("      %s\n", s.ProjectName)
+		if len(summary) > 50 {
+			summary = summary[:47] + "..."
+		}
+
+		// Columnar: num | date | project (padded) | prompts | summary
+		fmt.Printf("  %2d. %s%14s%s %s%-*s%s %s%11s%s  %s%s%s\n",
+			i+1,
+			colorDim, timeStr, colorReset,
+			colorCyan+colorBold, maxProjectWidth, projectName, colorReset,
+			colorDim, promptStr, colorReset,
+			colorDim, summary, colorReset)
 	}
 
 	fmt.Println()
@@ -418,6 +466,33 @@ func selectSession(sessions []session.SessionInfo) (*session.SessionInfo, error)
 	}
 
 	return &sessions[idx-1], nil
+}
+
+// formatProjectName cleans up project path for display
+func formatProjectName(name string) string {
+	// Remove common prefixes like -home-username-code-
+	name = strings.TrimPrefix(name, "-home-")
+
+	// Find the last meaningful part after -code- or similar
+	if idx := strings.LastIndex(name, "-code-"); idx != -1 {
+		name = name[idx+6:] // Skip "-code-"
+	} else if idx := strings.LastIndex(name, "-"); idx != -1 {
+		// Try to get just the last component if it looks like a project name
+		parts := strings.Split(name, "-")
+		if len(parts) > 2 {
+			// Take last 1-2 parts
+			name = strings.Join(parts[len(parts)-2:], "/")
+		}
+	}
+
+	// Replace remaining dashes with slashes for readability
+	name = strings.ReplaceAll(name, "-", "/")
+
+	if name == "" {
+		return "~"
+	}
+
+	return name
 }
 
 func openInBrowser(path string) error {
