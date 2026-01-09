@@ -2168,9 +2168,9 @@
 			return div.innerHTML;
 		}
 
-		// URL param support
+		// URL param support (from query string or injected by CLI)
 		const params = new URLSearchParams(window.location.search);
-		const urlParam = params.get('url');
+		const urlParam = params.get('url') || window.GIST_URL;
 		if (urlParam) {
 			document.getElementById('gist-url').value = urlParam;
 			loadSession();
