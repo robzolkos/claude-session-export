@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"archive/zip"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/robzolkos/claude-session-export/internal/gist"
 	"github.com/robzolkos/claude-session-export/internal/session"
@@ -86,6 +89,7 @@ COMMANDS:
 
 OPTIONS:
     -o, --output DIR     Save JSONL locally instead of uploading to Gist
+    --zip                Create a zip file with viewer and session data
     --no-open            Don't open viewer after uploading
     -h, --help           Show this help message
     -v, --version        Show version
@@ -93,6 +97,7 @@ OPTIONS:
 EXAMPLES:
     claude-session-export                          # Interactive picker, upload to Gist
     claude-session-export json session.jsonl      # Upload specific file to Gist
+    claude-session-export --zip                   # Create shareable zip file
     claude-session-export web SESSION_ID          # Fetch from API, upload to Gist
     claude-session-export search "error"          # Search sessions
     claude-session-export open https://gist.github.com/user/id`)
@@ -103,6 +108,7 @@ func runLocal(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	createZip := fs.Bool("zip", false, "Create a zip file with viewer and session")
 	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 	limit := fs.Int("limit", 30, "Maximum number of sessions to show")
 
@@ -126,7 +132,7 @@ func runLocal(args []string) error {
 		return err
 	}
 
-	return exportSession(selected.Path, *outputDir, *uploadGist, !*noOpen)
+	return exportSession(selected.Path, *outputDir, *uploadGist, *createZip, !*noOpen)
 }
 
 func runJSON(args []string) error {
@@ -134,6 +140,7 @@ func runJSON(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	createZip := fs.Bool("zip", false, "Create a zip file with viewer and session")
 	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
@@ -147,10 +154,10 @@ func runJSON(args []string) error {
 	path := fs.Arg(0)
 
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-		return exportURL(path, *outputDir, *uploadGist, !*noOpen)
+		return exportURL(path, *outputDir, *uploadGist, *createZip, !*noOpen)
 	}
 
-	return exportSession(path, *outputDir, *uploadGist, !*noOpen)
+	return exportSession(path, *outputDir, *uploadGist, *createZip, !*noOpen)
 }
 
 func runWeb(args []string) error {
@@ -158,6 +165,7 @@ func runWeb(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	createZip := fs.Bool("zip", false, "Create a zip file with viewer and session")
 	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 
 	if err := fs.Parse(reorderArgs(args)); err != nil {
@@ -189,7 +197,7 @@ func runWeb(args []string) error {
 	}
 	tmpFile.Close()
 
-	return exportSession(tmpFile.Name(), *outputDir, *uploadGist, !*noOpen)
+	return exportSession(tmpFile.Name(), *outputDir, *uploadGist, *createZip, !*noOpen)
 }
 
 func runSearch(args []string) error {
@@ -197,6 +205,7 @@ func runSearch(args []string) error {
 	outputDir := fs.String("o", "", "Output directory")
 	fs.StringVar(outputDir, "output", "", "Output directory")
 	uploadGist := fs.Bool("gist", false, "Upload to GitHub Gist")
+	createZip := fs.Bool("zip", false, "Create a zip file with viewer and session")
 	noOpen := fs.Bool("no-open", false, "Don't open viewer after uploading")
 	maxMatches := fs.Int("max-matches", 3, "Maximum matches to show per session")
 
@@ -265,7 +274,7 @@ func runSearch(args []string) error {
 	}
 
 	selected := results[idx-1].SessionInfo
-	return exportSession(selected.Path, *outputDir, *uploadGist, !*noOpen)
+	return exportSession(selected.Path, *outputDir, *uploadGist, *createZip, !*noOpen)
 }
 
 func runOpen(args []string) error {
@@ -278,10 +287,15 @@ func runOpen(args []string) error {
 	return openGistInViewer(gistURL)
 }
 
-func exportSession(path, outputDir string, uploadGist, openBrowser bool) error {
+func exportSession(path, outputDir string, uploadGist, createZip, openBrowser bool) error {
 	// Validate file exists and is readable
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("cannot access file: %w", err)
+	}
+
+	// Handle zip export
+	if createZip {
+		return exportAsZip(path, outputDir)
 	}
 
 	// Default to gist upload unless output dir is specified
@@ -350,7 +364,123 @@ func exportSession(path, outputDir string, uploadGist, openBrowser bool) error {
 	return nil
 }
 
-func exportURL(url, outputDir string, uploadGist, openBrowser bool) error {
+func exportAsZip(sessionPath, outputDir string) error {
+	// Read session data
+	sessionData, err := os.ReadFile(sessionPath)
+	if err != nil {
+		return fmt.Errorf("reading session file: %w", err)
+	}
+
+	// Parse session to get project name and timestamp for filename
+	sess, _ := session.ParseFile(sessionPath)
+	details, _ := session.GetSessionDetails(sessionPath)
+
+	// Build filename: project-date-time.zip
+	projectName := "session"
+	if sess != nil && len(sess.Messages) > 0 && sess.Messages[0].Cwd != "" {
+		// Extract project name from cwd
+		projectName = filepath.Base(sess.Messages[0].Cwd)
+	}
+	// Clean project name for filename
+	projectName = strings.ReplaceAll(projectName, " ", "-")
+	projectName = strings.ReplaceAll(projectName, "/", "-")
+
+	timestamp := time.Now()
+	if details != nil && !details.EndTime.IsZero() {
+		timestamp = details.EndTime
+	}
+	dateStr := timestamp.Local().Format("2006-01-02-1504")
+
+	zipFilename := fmt.Sprintf("%s-%s.zip", projectName, dateStr)
+
+	// Generate local viewer HTML with embedded session data
+	localViewer := generateLocalViewerHTML(sessionData)
+
+	// Determine output path
+	zipPath := zipFilename
+	if outputDir != "" {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("creating output directory: %w", err)
+		}
+		zipPath = filepath.Join(outputDir, zipFilename)
+	}
+
+	// Create zip file
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		return fmt.Errorf("creating zip file: %w", err)
+	}
+	defer zipFile.Close()
+
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	// Add viewer.html to zip (session data is embedded in the HTML)
+	viewerWriter, err := zipWriter.Create("viewer.html")
+	if err != nil {
+		return fmt.Errorf("adding viewer to zip: %w", err)
+	}
+	if _, err := viewerWriter.Write([]byte(localViewer)); err != nil {
+		return fmt.Errorf("writing viewer to zip: %w", err)
+	}
+
+	fmt.Printf("Created: %s\n", zipPath)
+	fmt.Println("Extract the zip and open viewer.html in a browser.")
+
+	return nil
+}
+
+func generateLocalViewerHTML(sessionData []byte) string {
+	// Start with the embedded viewer HTML
+	html := string(viewerHTML)
+
+	// Remove the URL input form
+	html = strings.Replace(html,
+		`<div class="url-form">`,
+		`<div class="url-form" style="display:none;">`, 1)
+
+	// Escape the session data for embedding in JavaScript
+	// We'll base64 encode it to avoid any escaping issues
+	encodedData := base64.StdEncoding.EncodeToString(sessionData)
+
+	// Inject JavaScript to load embedded data directly (no fetch needed)
+	localLoadScript := fmt.Sprintf(`
+	<script>
+		window.LOCAL_MODE = true;
+		window.EMBEDDED_SESSION = atob("%s");
+		window.addEventListener('DOMContentLoaded', function() {
+			try {
+				// Parse and render the embedded session data
+				parseJsonl(window.EMBEDDED_SESSION);
+				calculateActiveTime();
+				renderStats();
+				renderMessages();
+				document.getElementById('session-stats').classList.add('visible');
+			} catch (err) {
+				document.getElementById('status').textContent = 'Error: ' + err.message;
+				document.getElementById('status').className = 'status error';
+			}
+		});
+	</script>`, encodedData)
+
+	// Insert before </head>
+	html = strings.Replace(html, "</head>", localLoadScript+"</head>", 1)
+
+	// Remove the URL param auto-load at the end since we handle it ourselves
+	html = strings.Replace(html,
+		`// URL param support (from query string or injected by CLI)
+		const params = new URLSearchParams(window.location.search);
+		const urlParam = params.get('url') || window.GIST_URL;
+		if (urlParam) {
+			document.getElementById('gist-url').value = urlParam;
+			loadSession();
+		}`,
+		`// Local mode - loading handled by LOCAL_MODE script`, 1)
+
+	return html
+}
+
+func exportURL(url, outputDir string, uploadGist, createZip, openBrowser bool) error {
 	fmt.Printf("Fetching %s...\n", url)
 
 	resp, err := http.Get(url)
@@ -379,7 +509,7 @@ func exportURL(url, outputDir string, uploadGist, openBrowser bool) error {
 	}
 	tmpFile.Close()
 
-	return exportSession(tmpFile.Name(), outputDir, uploadGist, openBrowser)
+	return exportSession(tmpFile.Name(), outputDir, uploadGist, createZip, openBrowser)
 }
 
 // ANSI color codes
