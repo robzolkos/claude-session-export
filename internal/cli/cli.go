@@ -443,14 +443,17 @@ func openGistInViewer(gistURL string) error {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
 
-	if _, err := tmpFile.Write(viewerHTML); err != nil {
+	// Inject the gist URL into the HTML so it auto-loads
+	// Replace a placeholder or inject a script that sets the URL
+	html := string(viewerHTML)
+	injection := fmt.Sprintf(`<script>window.GIST_URL = %q;</script>`, gistURL)
+	html = strings.Replace(html, "</head>", injection+"</head>", 1)
+
+	if _, err := tmpFile.WriteString(html); err != nil {
 		tmpFile.Close()
 		return fmt.Errorf("writing viewer: %w", err)
 	}
 	tmpFile.Close()
 
-	viewerPath := tmpFile.Name()
-	urlWithParam := "file://" + viewerPath + "?url=" + gistURL
-
-	return openInBrowser(urlWithParam)
+	return openInBrowser(tmpFile.Name())
 }
